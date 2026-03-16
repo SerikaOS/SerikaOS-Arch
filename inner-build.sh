@@ -191,9 +191,17 @@ echo "[*] Installing media assets..."
 mkdir -p "$AIROOTFS/usr/share/wallpapers/SerikaOS"
 cp -r /serikaos/built-in-media/wallpapers/* "$AIROOTFS/usr/share/wallpapers/SerikaOS/" 2>/dev/null || true
 
-if [[ -f /serikaos/built-in-media/wallpapers/serika-pack-v1/wallpaper-1.jpg ]]; then
-    cp /serikaos/built-in-media/wallpapers/serika-pack-v1/wallpaper-1.jpg \
-        "$AIROOTFS/usr/share/sddm/themes/SerikaOS/Background.jpg"
+# Set primary hero wallpaper (using high-quality wallpaper-3.jpg)
+HERO_WALLPAPER="/serikaos/built-in-media/wallpapers/serika-pack-v1/wallpaper-3.jpg"
+if [[ -f "$HERO_WALLPAPER" ]]; then
+    # SDDM Background
+    cp "$HERO_WALLPAPER" "$AIROOTFS/usr/share/sddm/themes/SerikaOS/Background.jpg"
+    # GRUB Background
+    magick "$HERO_WALLPAPER" -resize 1920x1080^ -gravity center -extent 1920x1080 \
+        "$AIROOTFS/usr/share/grub/themes/SerikaOS/background.png" 2>/dev/null || true
+    # Syslinux Background
+    magick "$HERO_WALLPAPER" -resize 640x480^ -gravity center -extent 640x480 \
+        "$PROFILE_DIR/syslinux/splash.png" 2>/dev/null || true
 fi
 
 mkdir -p "$AIROOTFS/usr/share/sounds/SerikaOS"
@@ -217,12 +225,6 @@ echo "[*] Installing BIOS boot branding..."
 mkdir -p "$PROFILE_DIR/syslinux"
 cp -r /usr/share/archiso/configs/releng/syslinux/* "$PROFILE_DIR/syslinux/" 2>/dev/null || true
 cp -r /serikaos/archiso-profile/syslinux/* "$PROFILE_DIR/syslinux/" 2>/dev/null || true
-
-if [[ -f /serikaos/built-in-media/wallpapers/serika-pack-v1/wallpaper-1.jpg ]]; then
-    magick /serikaos/built-in-media/wallpapers/serika-pack-v1/wallpaper-1.jpg \
-        -resize 640x480^ -gravity center -extent 640x480 \
-        "$PROFILE_DIR/syslinux/splash.png" 2>/dev/null || true
-fi
 
 cat > "$PROFILE_DIR/syslinux/syslinux.cfg" << EOF
 DEFAULT select
@@ -555,6 +557,11 @@ EOF
 chmod +x "$AIROOTFS/etc/skel/Desktop/install-serikaos.desktop"
 cp "$AIROOTFS/etc/skel/Desktop/install-serikaos.desktop" "$AIROOTFS/root/Desktop/"
 chmod +x "$AIROOTFS/root/Desktop/install-serikaos.desktop"
+
+# Desktop Wallpaper Shortcut for liveuser
+mkdir -p "$AIROOTFS/home/liveuser/Desktop"
+ln -sf /usr/share/wallpapers/SerikaOS "$AIROOTFS/home/liveuser/Desktop/Wallpapers" 2>/dev/null || true
+chown -h liveuser:liveuser "$AIROOTFS/home/liveuser/Desktop/Wallpapers"
 
 # Root bashrc
 cat >> "$AIROOTFS/root/.bashrc" << 'EOF'

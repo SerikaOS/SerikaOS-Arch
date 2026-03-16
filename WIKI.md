@@ -1,53 +1,76 @@
-# SerikaOS — Technical Documentation
+# 📘 SerikaOS Comprehensive Build Guide
 
-Welcome to the internal engineering wiki for **SerikaOS**. This document provides an exhaustive breakdown of the architectural decisions, build pipeline, and system configurations.
+This document provides extreme detail on how the **SerikaOS** build system works, how to customize it, and how to generate your own rolling-release ISOs.
 
-## 🏗️ The Build Architecture
+## 🏗️ Architecture Overview
 
-SerikaOS uses a **Containerized Layered Build (CLB)** strategy. This ensures that the ISO environment is identical regardless of whether you are building on Arch, Ubuntu, or even macOS.
+SerikaOS uses a **Containerized Build System**. This means you don't need to install anything on your host machine except for **Docker**.
 
-### 1. The Orchestrator: `build-docker-iso.sh`
-- **Role**: Host-side wrapper.
-- **Function**: Pulls a fresh `archlinux:latest` Docker image, mounts the local source directory as a read-only volume, and executes the inner build logic with elevated privileges.
-- **Network**: Uses `--network host` to bypass Docker’s virtual NAT, preventing DNS timeouts.
+1.  **Host Script (`build-docker-iso.sh`)**: This is the orchestrator. It starts an Arch Linux container and mounts the local `SerikaOS-Arch` folder to `/serikaos`.
+2.  **Container Environment**: Inside the container (managed by the `archlinux:latest` image), it has the full Arch Linux toolset without polluting your host.
+3.  **Inner Script (`inner-build.sh`)**: This script runs *inside* the container. It:
+    *   Builds **Calamares** (the installer) and its dependencies from source (the AUR).
+    *   Creates a **Local Repository** (`/serikaos-repo`) containing those built packages.
+    *   Customizes the **Archiso Profile** (releng base).
+    *   Injects **Branding** (Logos, Plymouth, Wallpapers, SDDM Themes).
+    *   Executes `mkarchiso` to wrap everything into the final `.iso`.
 
-### 2. The Engine: `inner-build.sh`
-This script runs *inside* the container and performs the heavy lifting:
-- **Dependency Bootstrap**: Installs `archiso`, `grub`, `git`, and build tools.
-- **AUR Compilation**: Since SerikaOS is "Pure Arch," we do not use pre-built binaries from third parties. We compile `calamares` and its dependencies directly from the AUR to ensure binary integrity.
-- **Local Repository Creation**: Built packages are indexed into a local Pacman repository located at `/serikaos-repo`.
-- **Profile Customization**: Patches the standard Arch `releng` profile with SerikaOS branding.
+## 🛠️ How to Build
+
+### 1. Prerequisites
+Ensure Docker is installed and your user is in the `docker` group.
+```bash
+sudo systemctl enable --now docker
+sudo usermod -aG docker $USER
+```
+
+### 2. Execution
+Run the orchestrator script:
+```bash
+bash build-docker-iso.sh
+```
+*Wait approximately 45-60 minutes.* The first build takes longer because it compiles Calamares from source. Subsequent builds use Docker layer caching where possible.
+
+### 3. Output
+The final ISO will be placed in the `out/` directory:
+- `out/serikaos-YYYY.MM.DD-x86_64.iso`
+
+## 🎨 Branding Customization
+
+### Wallpapers
+Place your wallpapers in `built-in-media/wallpapers/`. The build script automatically picks up files in `serika-pack-v1/` and sets `wallpaper-3.jpg` as the system default.
+
+### Logos
+- **Main Text Logo**: `built-in-media/logo/SerikaOS-LogoText.png`
+- **Icon Logo**: `built-in-media/logo/serikaos-logo.png`
+These are automatically resized for Plymouth, Calamares, and the SDDM theme.
+
+### SDDM (Login Screen)
+The theme logic is located in `sddm-theme/`. It uses **QtQuick** and **QML**.
+- `Main.qml`: The core layout (Astronaut sidebar style).
+- `Logo.png`: The sidebar branding (automatically copied during build).
+
+## 🧩 Advanced Configuration
+
+### Modifying Package Lists
+To add or remove software from the Live ISO, edit `archiso-profile/packages.x86_64`. Make sure to avoid bloating the ISO—SerikaOS follows the Arch philosophy of installing only the essentials for the live session.
+
+### The `airootfs` (Root Filesystem)
+Static configuration files (like `/etc/hosts` or system default settings) are located in `archiso-profile/airootfs/`. These are overlayed onto the ISO root.
+
+### Dynamic Customization
+The `inner-build.sh` script generates a `customize_airootfs.sh` script at build time. This script runs inside the ISO's chroot environment and handles:
+- User creation (`liveuser`).
+- Plymouth theme initialization.
+- SDDM autologin.
+- OS identification (`/etc/os-release`).
+
+## 🚢 Release Process
+
+1.  Verify the ISO in a virtual machine (QEMU or VirtualBox).
+2.  Commit your changes to the repo.
+3.  Tag the release (e.g., `v0.0.1`).
+4.  Upload the `.iso` and its `.sha256` to the GitHub Release page.
 
 ---
-
-## 🎨 Design Systems
-
-### GRUB2 Bootloader
-- **Path**: `grub-theme/`
-- **Logic**: Fonts are dynamically generated into `.pf2` format during build. We use `${prefix}` pathing in `grub.cfg` to ensure icons load correctly across different hardware.
-
-### SDDM Login
-- **Path**: `sddm-theme/`
-- **Stack**: Qt 6 + QML + Qt5Compat.
-- **Environment**: Performance flags like `KWIN_EFFECTS_FOR_LOW_PERFORMANCE=1` are injected via `/etc/environment` to ensure smoothness in VirtualBox.
-
----
-
-## 🛠️ Step-by-Step: Modification to Build
-
-If you want to add a new package or change a system file:
-
-1.  **Add Package**: Edit `archiso-profile/packages-live.x86_64`.
-2.  **Add/Modify File**: Place it in `archiso-profile/airootfs/...` following the standard Linux filesystem hierarchy.
-3.  **Update Logic**: If it requires a service to be enabled, add the `systemctl enable` symlink in `inner-build.sh`.
-4.  **Execute**: Run `sudo ./build-docker-iso.sh`.
-
----
-
-## ⚡ Performance Tuning
-We use SquashFS with `zstd` compression.
-- **Development**: Compression level **3** (Fast builds, larger ISO).
-- **Production**: Compression level **15** (Slower builds, smallest ISO).
-
----
-*Document Version: 1.0.0*
+*SerikaOS — Your System. Your Rules.*
