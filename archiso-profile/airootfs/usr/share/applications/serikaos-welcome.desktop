@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=SerikaOS Welcome
+GenericName=Welcome Application
+Comment=Welcome to SerikaOS — choose Install or Try
+Exec=konsole --hide-menubar --hide-tabbar -e /usr/local/bin/serikaos-welcome
+Icon=system-help
+Terminal=false
+Categories=System;
+Keywords=welcome;serikaos;

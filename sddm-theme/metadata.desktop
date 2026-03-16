@@ -1,0 +1,9 @@
+[SddmGreeterTheme]
+Name=SerikaOS
+Description=SerikaOS login theme — Serika Kuromi from Blue Archive
+Author=SerikaOS
+Version=1.0
+Screenshot=preview.png
+MainScript=Main.qml
+Background=Background.jpg
+Type=sddm-theme

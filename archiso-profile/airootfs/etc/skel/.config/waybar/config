@@ -1,0 +1,84 @@
+// SerikaOS — Waybar Configuration
+{
+    "layer": "top",
+    "position": "top",
+    "height": 36,
+    "spacing": 0,
+    "margin-top": 6,
+    "margin-left": 10,
+    "margin-right": 10,
+    
+    "modules-left": ["hyprland/workspaces", "hyprland/window"],
+    "modules-center": ["clock"],
+    "modules-right": ["tray", "pulseaudio", "network", "battery", "custom/power"],
+
+    "hyprland/workspaces": {
+        "format": "{icon}",
+        "format-icons": {
+            "1": "一",
+            "2": "二",
+            "3": "三",
+            "4": "四",
+            "5": "五",
+            "active": "●",
+            "default": "○"
+        },
+        "on-click": "activate",
+        "sort-by-number": true
+    },
+
+    "hyprland/window": {
+        "format": "{}",
+        "max-length": 40,
+        "rewrite": {
+            "(.*) — Mozilla Firefox": " $1",
+            "(.*) - foot": " $1"
+        }
+    },
+
+    "clock": {
+        "format": "{:%H:%M}",
+        "format-alt": "{:%A, %B %d, %Y}",
+        "tooltip-format": "<big>{:%Y %B}</big>\n<tt><small>{calendar}</small></tt>"
+    },
+
+    "battery": {
+        "states": {
+            "warning": 30,
+            "critical": 15
+        },
+        "format": "{icon}  {capacity}%",
+        "format-charging": "⚡ {capacity}%",
+        "format-icons": ["", "", "", "", ""],
+        "tooltip-format": "{timeTo}"
+    },
+
+    "network": {
+        "format-wifi": "  {signalStrength}%",
+        "format-ethernet": " ",
+        "format-disconnected": "  Off",
+        "tooltip-format-wifi": "{essid} ({signalStrength}%)",
+        "tooltip-format-ethernet": "{ifname}: {ipaddr}",
+        "on-click": "nm-connection-editor"
+    },
+
+    "pulseaudio": {
+        "format": "{icon}  {volume}%",
+        "format-muted": " ",
+        "format-icons": {
+            "default": ["", "", ""]
+        },
+        "on-click": "pavucontrol"
+    },
+
+    "tray": {
+        "icon-size": 16,
+        "spacing": 8
+    },
+
+    "custom/power": {
+        "format": "⏻",
+        "tooltip": false,
+        "on-click": "wlogout"
+    }
+}

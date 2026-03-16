@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+# ============================================================
+# SerikaOS — os-release branding
+# This file overrides /etc/os-release to brand the OS
+# ============================================================
+NAME="SerikaOS"
+PRETTY_NAME="SerikaOS"
+ID=serikaos
+ID_LIKE=arch
+BUILD_ID=rolling
+ANSI_COLOR="38;2;232;160;191"
+HOME_URL="https://github.com/serikaos"
+DOCUMENTATION_URL="https://wiki.archlinux.org"
+SUPPORT_URL="https://github.com/serikaos/issues"
+BUG_REPORT_URL="https://github.com/serikaos/issues"
+PRIVACY_POLICY_URL="https://github.com/serikaos"
+LOGO=serikaos

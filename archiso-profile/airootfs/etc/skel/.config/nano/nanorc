@@ -1,0 +1,39 @@
+# SerikaOS — nano configuration
+# Premium text editing in the terminal
+
+# Display
+set linenumbers
+set minibar
+set tabsize 4
+set tabstospaces
+set mouse
+set smooth
+set softwrap
+set titlecolor bold,white,black
+set promptcolor white,black
+set statuscolor bold,white,black
+set errorcolor bold,white,red
+set selectedcolor white,magenta
+set stripecolor ,black
+set scrollercolor white
+set numbercolor cyan
+set keycolor cyan
+set functioncolor green
+
+# Key bindings (modern)
+set constantshow
+set indicator
+set autoindent
+set cutfromcursor
+
+# Backups
+set backup
+set backupdir "~/.local/share/nano/backups"
+
+# File browser
+set zap
+set atblanks
+
+# Syntax highlighting
+include "/usr/share/nano/*.nanorc"
+include "/usr/share/nano/extra/*.nanorc"

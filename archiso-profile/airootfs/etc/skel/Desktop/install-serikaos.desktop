@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Install SerikaOS
+Comment=Launch the SerikaOS installer
+Exec=/usr/local/bin/serikaos-installer
+Icon=system-software-install
+Terminal=false
+Categories=System;
+StartupNotify=true
+SingleMainWindow=true

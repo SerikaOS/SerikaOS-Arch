@@ -1,0 +1,15 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=Install SerikaOS
+GenericName=System Installer
+Comment=Install SerikaOS to your hard drive
+Exec=sudo /usr/bin/calamares
+Icon=system-software-install
+Terminal=false
+Categories=System;
+Keywords=install;installer;calamares;setup;
+StartupNotify=true
+StartupWMClass=calamares
+X-GNOME-Autostart-enabled=false
+SingleMainWindow=true

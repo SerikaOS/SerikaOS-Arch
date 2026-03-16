@@ -1,0 +1,5 @@
+# SerikaOS — lsb-release branding
+DISTRIB_ID=SerikaOS
+DISTRIB_RELEASE=rolling
+DISTRIB_DESCRIPTION="SerikaOS"
+DISTRIB_CODENAME=serika

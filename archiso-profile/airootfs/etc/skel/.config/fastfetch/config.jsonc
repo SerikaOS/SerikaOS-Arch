@@ -1,0 +1,98 @@
+{
+    "$schema": "https://github.com/fastfetch-cli/fastfetch/raw/dev/doc/json_schema.json",
+    "logo": {
+        "type": "file",
+        "source": "/usr/share/serikaos/ascii-logo.txt",
+        "padding": {
+            "top": 1,
+            "left": 2,
+            "right": 3
+        }
+    },
+    "display": {
+        "separator": "  ",
+        "color": {
+            "keys": "38;2;92;198;208",
+            "title": "38;2;232;160;191",
+            "separator": "38;2;106;106;138"
+        }
+    },
+    "modules": [
+        {
+            "type": "title",
+            "format": "{user-name}@{host-name}",
+            "key": " "
+        },
+        {
+            "type": "separator",
+            "string": "─────────────────────────────"
+        },
+        {
+            "type": "os",
+            "key": "  OS",
+            "format": "SerikaOS"
+        },
+        {
+            "type": "host",
+            "key": " 󰟀 Host"
+        },
+        {
+            "type": "kernel",
+            "key": "  Kernel"
+        },
+        {
+            "type": "uptime",
+            "key": " 󰅐 Uptime"
+        },
+        {
+            "type": "packages",
+            "key": " 󰏖 Packages"
+        },
+        {
+            "type": "shell",
+            "key": "  Shell"
+        },
+        {
+            "type": "de",
+            "key": " 󰧨 DE"
+        },
+        {
+            "type": "wm",
+            "key": "  WM"
+        },
+        {
+            "type": "wmtheme",
+            "key": " 󰉼 Theme"
+        },
+        {
+            "type": "icons",
+            "key": " 󰀻 Icons"
+        },
+        {
+            "type": "terminal",
+            "key": "  Terminal"
+        },
+        {
+            "type": "cpu",
+            "key": " 󰻠 CPU"
+        },
+        {
+            "type": "gpu",
+            "key": " 󰍹 GPU"
+        },
+        {
+            "type": "memory",
+            "key": " 󰑭 Memory"
+        },
+        {
+            "type": "disk",
+            "key": " 󰋊 Disk (/)"
+        },
+        "break",
+        {
+            "type": "colors",
+            "paddingLeft": 2,
+            "symbol": "circle"
+        }
+    ]
+}

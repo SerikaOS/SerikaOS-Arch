@@ -1,0 +1,49 @@
+#!/bin/bash
+# ============================================================
+# SerikaOS — Installer Launcher
+# Single entrypoint for the live session installer
+# ============================================================
+
+CALAMARES_BIN="/usr/bin/calamares"
+
+notify_user() {
+    local message="$1"
+    if command -v notify-send &>/dev/null && { [[ -n "${DISPLAY:-}" ]] || [[ -n "${WAYLAND_DISPLAY:-}" ]]; }; then
+        notify-send -i system-software-install "SerikaOS Installer" "$message" 2>/dev/null || true
+    fi
+}
+
+# Check if already running
+if pgrep -x calamares &>/dev/null; then
+    notify_user "The installer is already running."
+    exit 0
+fi
+
+# Must have a display
+if [[ -z "${DISPLAY:-}" ]] && [[ -z "${WAYLAND_DISPLAY:-}" ]]; then
+    echo "No display server detected. Please start the desktop environment first."
+    exit 1
+fi
+
+# Check if calamares binary exists
+if [[ ! -x "${CALAMARES_BIN}" ]]; then
+    # Try archinstall as fallback
+    if command -v archinstall &>/dev/null; then
+        notify_user "Graphical installer not available. Launching archinstall..."
+        if command -v konsole &>/dev/null; then
+            exec konsole --hide-menubar --hide-tabbar -e archinstall
+        else
+            exec archinstall
+        fi
+    fi
+
+    notify_user "No installer found. Please ensure calamares is installed."
+    echo "No installer was found on this live image."
+    exit 1
+fi
+
+notify_user "Starting the SerikaOS installer..."
+
+# Launch Calamares with sudo (liveuser has NOPASSWD sudo)
+# Pass display environment so the GUI can render
+exec sudo -E "${CALAMARES_BIN}"

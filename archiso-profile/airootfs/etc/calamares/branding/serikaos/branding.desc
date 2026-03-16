@@ -1,0 +1,43 @@
+---
+componentName:  serikaos
+
+# Strings
+strings:
+    productName:         SerikaOS
+    shortProductName:    SerikaOS
+    version:             2026.03
+    shortVersion:        2026.03
+    versionedName:       SerikaOS 2026.03
+    shortVersionedName:  SerikaOS 2026.03
+    bootloaderEntryName: SerikaOS
+    productUrl:          https://github.com/serikaos
+    supportUrl:          https://github.com/serikaos/issues
+    knownIssuesUrl:      https://github.com/serikaos/issues
+    releaseNotesUrl:     https://github.com/serikaos/releases
+    donateUrl:           https://github.com/serikaos
+
+# Images
+images:
+    productLogo:         "logo.png"
+    productIcon:         "logo.png"
+    productWelcome:      "welcome.png"
+    productWallpaper:    "wallpaper.png"
+
+# Slideshow — shown during installation
+slideshow:               "show.qml"
+slideshowAPI:            2
+
+# Style
+style:
+    sidebarBackground:   "#1a1b2e"
+    sidebarText:         "#c8c8d8"
+    sidebarTextSelect:   "#e8a0bf"
+    sidebarTextHighlight: "#5cc6d0"
+
+# Window size
+windowExpanding:    normal
+windowSize:         1366px,820px
+windowPlacement:    center
+
+# Navigation
+navigationReturnByDefault: false

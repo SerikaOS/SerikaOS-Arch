@@ -1,0 +1,121 @@
+/* SerikaOS — Waybar Stylesheet */
+
+* {
+    font-family: "Inter", "Noto Sans", "JetBrains Mono Nerd Font", sans-serif;
+    font-size: 13px;
+    min-height: 0;
+}
+
+window#waybar {
+    background: rgba(26, 27, 46, 0.85);
+    border-radius: 12px;
+    border: 1px solid rgba(42, 43, 62, 0.8);
+    color: #c8c8d8;
+}
+
+tooltip {
+    background: #12131f;
+    border: 1px solid #3a3b4e;
+    border-radius: 8px;
+    color: #c8c8d8;
+}
+
+#workspaces button {
+    padding: 0 8px;
+    color: #6a6a8a;
+    background: transparent;
+    border: none;
+    border-radius: 6px;
+    margin: 4px 2px;
+    transition: all 0.2s ease;
+}
+
+#workspaces button:hover {
+    background: rgba(92, 198, 208, 0.15);
+    color: #5cc6d0;
+}
+
+#workspaces button.active {
+    background: rgba(232, 160, 191, 0.2);
+    color: #e8a0bf;
+    font-weight: bold;
+}
+
+#workspaces button.urgent {
+    background: rgba(255, 107, 107, 0.3);
+    color: #ff6b6b;
+}
+
+#window {
+    color: #6a6a8a;
+    padding: 0 12px;
+}
+
+#clock {
+    color: #e8a0bf;
+    font-weight: bold;
+    font-size: 14px;
+    padding: 0 12px;
+}
+
+#battery {
+    color: #5cc6d0;
+    padding: 0 10px;
+}
+
+#battery.charging {
+    color: #d4a853;
+}
+
+#battery.warning:not(.charging) {
+    color: #d4a853;
+}
+
+#battery.critical:not(.charging) {
+    color: #ff6b6b;
+    animation: blink 1s linear infinite alternate;
+}
+
+@keyframes blink {
+    to { color: #c8c8d8; }
+}
+
+#network {
+    color: #5cc6d0;
+    padding: 0 10px;
+}
+
+#network.disconnected {
+    color: #6a6a8a;
+}
+
+#pulseaudio {
+    color: #d4a853;
+    padding: 0 10px;
+}
+
+#pulseaudio.muted {
+    color: #6a6a8a;
+}
+
+#tray {
+    padding: 0 8px;
+}
+
+#tray > .passive {
+    -gtk-icon-effect: dim;
+}
+
+#tray > .needs-attention {
+    -gtk-icon-effect: highlight;
+}
+
+#custom-power {
+    color: #e8a0bf;
+    padding: 0 12px 0 8px;
+    font-size: 16px;
+}
+
+#custom-power:hover {
+    color: #ff6b6b;
+}

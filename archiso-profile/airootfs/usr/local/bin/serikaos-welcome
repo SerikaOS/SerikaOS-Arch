@@ -1,0 +1,222 @@
+#!/bin/bash
+# ============================================================
+# SerikaOS — Premium Live Session Welcome & Mode Selector
+# A beautiful TUI interface for Install / Try Out modes
+# ============================================================
+
+PINK='\033[38;2;232;160;191m'
+TEAL='\033[38;2;92;198;208m'
+GOLD='\033[38;2;212;168;83m'
+DIM='\033[38;2;106;106;138m'
+NAVY='\033[48;2;26;27;46m'
+LIGHT='\033[38;2;200;200;216m'
+RESET='\033[0m'
+BOLD='\033[1m'
+BLINK='\033[5m'
+
+clear
+
+
+
+# Get terminal dimensions
+COLS=$(tput cols 2>/dev/null || echo 80)
+ROWS=$(tput lines 2>/dev/null || echo 24)
+
+center_text() {
+    local text="$1"
+    local clean_text
+    clean_text=$(echo -e "$text" | sed 's/\x1b\[[0-9;]*m//g')
+    local len=${#clean_text}
+    local pad=$(( (COLS - len) / 2 ))
+    [[ $pad -lt 0 ]] && pad=0
+    printf "%${pad}s" ""
+    echo -e "$text"
+}
+
+draw_separator() {
+    local char="${1:-─}"
+    local width="${2:-60}"
+    local pad=$(( (COLS - width) / 2 ))
+    printf "%${pad}s" ""
+    printf "${DIM}"
+    for ((i=0; i<width; i++)); do printf "%s" "$char"; done
+    printf "${RESET}\n"
+}
+
+# ── Logo ──
+echo ""
+center_text "${PINK}${BOLD}   ███████╗███████╗██████╗ ██╗██╗  ██╗ █████╗ ${TEAL} ██████╗ ███████╗${RESET}"
+center_text "${PINK}${BOLD}   ██╔════╝██╔════╝██╔══██╗██║██║ ██╔╝██╔══██╗${TEAL}██╔═══██╗██╔════╝${RESET}"
+center_text "${PINK}${BOLD}   ███████╗█████╗  ██████╔╝██║█████╔╝ ███████║${TEAL}██║   ██║███████╗${RESET}"
+center_text "${PINK}${BOLD}   ╚════██║██╔══╝  ██╔══██╗██║██╔═██╗ ██╔══██║${TEAL}██║   ██║╚════██║${RESET}"
+center_text "${PINK}${BOLD}   ███████║███████╗██║  ██║██║██║  ██╗██║  ██║${TEAL}╚██████╔╝███████║${RESET}"
+center_text "${PINK}${BOLD}   ╚══════╝╚══════╝╚═╝  ╚═╝╚═╝╚═╝  ╚═╝╚═╝  ╚═╝${TEAL} ╚═════╝ ╚══════╝${RESET}"
+echo ""
+center_text "${DIM}Your system. Your rules. Zero bloatware.${RESET}"
+echo ""
+draw_separator "═" 64
+
+echo ""
+center_text "${LIGHT}${BOLD}Welcome to the SerikaOS Live Environment${RESET}"
+center_text "${DIM}Choose what you'd like to do:${RESET}"
+echo ""
+echo ""
+
+# ── Menu Options ──
+draw_option() {
+    local num="$1"
+    local icon="$2"
+    local title="$3"
+    local desc="$4"
+    local color="$5"
+    local pad=$(( (COLS - 58) / 2 ))
+    [[ $pad -lt 0 ]] && pad=0
+    printf "%${pad}s" ""
+    echo -e "  ${color}${BOLD}  ${icon}  ${num}. ${title}${RESET}"
+    printf "%${pad}s" ""
+    echo -e "       ${DIM}${desc}${RESET}"
+    echo ""
+}
+
+draw_option "1" "💿" "Install SerikaOS" "Launch the premium Calamares installer" "${PINK}"
+draw_option "2" "🖥️" "Try SerikaOS" "Explore the desktop without installing" "${TEAL}"
+draw_option "3" "⚙️" "Advanced Options" "Terminal, network tools, recovery" "${GOLD}"
+draw_option "4" "📋" "About SerikaOS" "Version info, features, philosophy" "${LIGHT}"
+draw_option "5" "⏻ " "Power Off" "Shutdown the system" "${DIM}"
+
+draw_separator "─" 64
+echo ""
+
+# ── Input ──
+pad=$(( (COLS - 58) / 2 ))
+[[ $pad -lt 0 ]] && pad=0
+while true; do
+    printf "%${pad}s" ""
+    printf "  ${TEAL}${BOLD}❯${RESET} ${LIGHT}Enter choice ${DIM}[1-5]${RESET}: "
+    read -r choice
+
+    case "$choice" in
+        1)
+            echo ""
+            center_text "${PINK}${BOLD}  Launching SerikaOS Installer...${RESET}"
+            echo ""
+            sleep 1
+            if command -v serikaos-installer &>/dev/null; then
+                serikaos-installer
+                echo ""
+                center_text "${DIM}  Installer closed. Returning to menu...${RESET}"
+                sleep 1
+                exec "$0"
+            else
+                center_text "${GOLD}  Installer launcher not found. Open a terminal and run: serikaos-installer${RESET}"
+                sleep 3
+                continue
+            fi
+            ;;
+        2)
+            echo ""
+            center_text "${TEAL}${BOLD}  Starting desktop session...${RESET}"
+            center_text "${DIM}  Enjoy exploring SerikaOS!${RESET}"
+            echo ""
+            sleep 1
+            break
+            ;;
+        3)
+            clear
+            echo ""
+            center_text "${GOLD}${BOLD}  SerikaOS — Advanced Options${RESET}"
+            echo ""
+            draw_separator "─" 50
+            echo ""
+            draw_option "a" "🖥️" "Open Terminal" "Launch a shell session" "${TEAL}"
+            draw_option "b" "🌐" "Network Setup" "Configure WiFi/Ethernet" "${TEAL}"
+            draw_option "c" "📊" "System Info" "Run fastfetch" "${TEAL}"
+            draw_option "d" "🔧" "Partition Editor" "Launch GParted or cfdisk" "${TEAL}"
+            draw_option "e" "↩️" " Back" "Return to main menu" "${DIM}"
+            echo ""
+
+            printf "%${pad}s" ""
+            printf "  ${GOLD}${BOLD}❯${RESET} ${LIGHT}Choice: ${RESET}"
+            read -r adv_choice
+
+            case "$adv_choice" in
+                a) exec bash -l ;;
+                b)
+                    if command -v nmtui &>/dev/null; then
+                        nmtui
+                    else
+                        echo -e "${DIM}  NetworkManager TUI not available. Use: nmcli${RESET}"
+                        sleep 2
+                    fi
+                    exec "$0"
+                    ;;
+                c)
+                    if command -v fastfetch &>/dev/null; then
+                        fastfetch
+                    elif command -v neofetch &>/dev/null; then
+                        neofetch
+                    else
+                        uname -a
+                    fi
+                    echo ""
+                    read -rp "  Press Enter to continue..."
+                    exec "$0"
+                    ;;
+                d)
+                    if command -v gparted &>/dev/null; then
+                        sudo gparted &
+                    else
+                        sudo cfdisk
+                    fi
+                    exec "$0"
+                    ;;
+                *) exec "$0" ;;
+            esac
+            ;;
+        4)
+            clear
+            echo ""
+            center_text "${PINK}${BOLD}  ╔═══════════════════════════════════════════╗${RESET}"
+            center_text "${PINK}${BOLD}  ║          About SerikaOS                  ║${RESET}"
+            center_text "${PINK}${BOLD}  ╚═══════════════════════════════════════════╝${RESET}"
+            echo ""
+            center_text "${TEAL}${BOLD}  Version:${RESET} ${LIGHT}2026.03 (Rolling Release)${RESET}"
+            center_text "${TEAL}${BOLD}  Base:${RESET}    ${LIGHT}SerikaOS Rolling Platform${RESET}"
+            center_text "${TEAL}${BOLD}  Theme:${RESET}   ${LIGHT}Serika Kuromi — Blue Archive${RESET}"
+            center_text "${TEAL}${BOLD}  License:${RESET} ${LIGHT}GPL-3.0${RESET}"
+            echo ""
+            center_text "${GOLD}${BOLD}  Philosophy${RESET}"
+            center_text "${DIM}  ● Your system, your rules — every app is opt-in${RESET}"
+            center_text "${DIM}  ● Zero bloatware — nothing pre-installed you didn't choose${RESET}"
+            center_text "${DIM}  ● Privacy first — DNS-over-HTTPS, MAC randomization${RESET}"
+            center_text "${DIM}  ● Rolling-release power — fast updates, full user control${RESET}"
+            center_text "${DIM}  ● Beautiful by default — every pixel themed with care${RESET}"
+            echo ""
+            center_text "${TEAL}${BOLD}  Features${RESET}"
+            center_text "${DIM}  ● 9 Desktop Environments (KDE/GNOME/Hyprland/Budgie/...)${RESET}"
+            center_text "${DIM}  ● 4 Kernel options (standard/zen/hardened/lts)${RESET}"
+            center_text "${DIM}  ● Full privacy hardening suite built-in${RESET}"
+            center_text "${DIM}  ● Premium GRUB + SDDM + Calamares theming${RESET}"
+            center_text "${DIM}  ● Custom wallpapers, sounds, and color schemes${RESET}"
+            echo ""
+            draw_separator "─" 50
+            echo ""
+            printf "%${pad}s" ""
+            read -rp "  Press Enter to go back..."
+            exec "$0"
+            ;;
+        5)
+            echo ""
+            center_text "${PINK}  Shutting down SerikaOS...${RESET}"
+            center_text "${DIM}  Thank you for trying SerikaOS 💜${RESET}"
+            echo ""
+            sleep 2
+            sudo poweroff
+            ;;
+        *)
+            printf "%${pad}s" ""
+            echo -e "  ${GOLD}  Invalid choice. Please enter 1-5.${RESET}"
+            echo ""
+            ;;
+    esac
+done

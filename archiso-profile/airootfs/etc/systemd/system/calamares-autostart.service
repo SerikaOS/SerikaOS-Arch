@@ -1,0 +1,18 @@
+# SerikaOS — Calamares systemd target
+# When serikaos.install=1 is on the kernel cmdline, boot directly into the installer
+[Unit]
+Description=SerikaOS Calamares Installer
+Requires=graphical.target
+After=graphical.target display-manager.service
+
+[Service]
+Type=simple
+ExecStartPre=/bin/sleep 3
+ExecStart=/usr/local/bin/serikaos-installer
+Restart=no
+User=root
+Environment=DISPLAY=:0
+Environment=QT_QPA_PLATFORMTHEME=qt5ct
+
+[Install]
+WantedBy=graphical.target

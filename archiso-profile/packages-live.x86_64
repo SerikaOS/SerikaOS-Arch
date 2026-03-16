@@ -1,0 +1,135 @@
+# ============================================================
+# SerikaOS — Live ISO Package List
+# ============================================================
+# Goal: Smallest possible ISO that boots into a working desktop
+# with the Calamares installer. ALL other software is chosen
+# by the user during installation via the netinstall module.
+# ============================================================
+
+# ── Base System ──
+base
+linux
+linux-firmware
+mkinitcpio
+mkinitcpio-archiso
+syslinux
+
+# ── Bootloader ──
+grub
+efibootmgr
+
+# ── GPU Drivers (covers most hardware) ──
+mesa
+xf86-video-vesa
+xf86-video-amdgpu
+xf86-video-intel
+xf86-video-nouveau
+xf86-video-qxl
+
+# ── VM Guest Tools (smooth VM experience) ──
+spice-vdagent
+qemu-guest-agent
+virtualbox-guest-utils-nox
+open-vm-tools
+
+# ── X11 Server (REQUIRED for KDE X11 session) ──
+xorg-server
+xorg-xinit
+xorg-xrandr
+xorg-xdpyinfo
+xorg-xset
+
+# ── Network (live must have connectivity) ──
+networkmanager
+network-manager-applet
+iwd
+wpa_supplicant
+dhcpcd
+
+# ── Audio (minimal PipeWire for live session) ──
+pipewire
+pipewire-pulse
+wireplumber
+
+# ── Filesystem (partitioning & mounting) ──
+btrfs-progs
+dosfstools
+e2fsprogs
+ntfs-3g
+xfsprogs
+f2fs-tools
+gptfdisk
+parted
+
+# ── Core Utilities ──
+sudo
+nano
+curl
+wget
+less
+which
+pv
+git
+
+# ── KDE Plasma (live desktop — full working set) ──
+plasma-desktop
+plasma-workspace
+plasma-x11-session
+plasma-nm
+plasma-pa
+kwin
+kwayland-integration
+sddm
+sddm-kcm
+konsole
+dolphin
+breeze
+breeze-gtk
+kde-gtk-config
+xdg-desktop-portal-kde
+xdg-desktop-portal
+qt6-wayland
+qt6-5compat
+qt6-declarative
+qt5-wayland
+wayland
+wayland-protocols
+libxkbcommon
+plymouth
+
+# ── Calamares Installer (THE ACTUAL INSTALLER!) ──
+calamares
+
+# ── Calamares Dependencies ──
+arch-install-scripts
+qt5-base
+qt5-declarative
+qt5-svg
+qt5-quickcontrols2
+qt5-graphicaleffects
+yaml-cpp
+kpmcore
+boost-libs
+icu
+polkit-qt5
+libpwquality
+
+# ── System Tools (needed for installer & live session) ──
+polkit
+polkit-kde-agent
+libnotify
+wmctrl
+squashfs-tools
+rsync
+os-prober
+
+# ── Theming ──
+papirus-icon-theme
+noto-fonts
+noto-fonts-emoji
+ttf-dejavu
+
+# ── Branding & Info ──
+fastfetch
+xdg-utils
+xdg-user-dirs

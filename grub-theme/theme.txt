@@ -1,0 +1,98 @@
+# ============================================================
+# SerikaOS — GRUB2 Theme
+# Premium boot experience themed around Serika Kuromi
+# ============================================================
+
+# --- Global ---
+title-text:                     ""
+desktop-image:                  "background.png"
+desktop-color:                  "#1a1b2e"
+terminal-font:                  "DejaVu Sans Regular 14"
+terminal-left:                  "0"
+terminal-top:                   "0"
+terminal-width:                 "100%"
+terminal-height:                "100%"
+terminal-border:                "0"
+message-font:                   "DejaVu Sans Regular 14"
+message-color:                  "#6a6a8a"
+message-bg-color:               "#00000000"
+
+# --- Boot Menu ---
++ boot_menu {
+    left                        = 30%
+    top                         = 30%
+    width                       = 40%
+    height                      = 40%
+    item_font                   = "DejaVu Sans Regular 16"
+    item_color                  = "#c8c8d8"
+    selected_item_font          = "DejaVu Sans Bold 16"
+    selected_item_color         = "#e8a0bf"
+    icon_width                  = 32
+    icon_height                 = 32
+    item_height                 = 44
+    item_padding                = 12
+    item_icon_space             = 16
+    item_spacing                = 6
+    selected_item_pixmap_style  = "select_*.png"
+    scrollbar                   = true
+    scrollbar_width             = 4
+    scrollbar_thumb             = "scrollbar_thumb_*.png"
+    scrollbar_frame             = "scrollbar_frame_*.png"
+    menu_pixmap_style           = "menu_*.png"
+}
+
+# --- Title: "SerikaOS" ---
++ label {
+    left                        = 30%
+    top                         = 16%
+    width                       = 40%
+    align                       = "center"
+    text                        = "SerikaOS"
+    color                       = "#e8a0bf"
+    font                        = "DejaVu Sans Bold 24"
+}
+
+# --- Subtitle ---
++ label {
+    left                        = 30%
+    top                         = 21%
+    width                       = 40%
+    align                       = "center"
+    text                        = "Your system. Your rules."
+    color                       = "#6a6a8a"
+    font                        = "DejaVu Sans Regular 12"
+}
+
+# --- Timeout Label ---
++ label {
+    left                        = 30%
+    top                         = 25%
+    width                       = 40%
+    align                       = "center"
+    id                          = "__timeout__"
+    text                        = "Booting in %d seconds..."
+    color                       = "#5cc6d0"
+    font                        = "DejaVu Sans Regular 14"
+}
+
+# --- Navigation Hints ---
++ label {
+    left                        = 30%
+    top                         = 80%
+    width                       = 40%
+    align                       = "center"
+    text                        = "↑↓ Navigate  •  Enter Select  •  E Edit  •  C Console"
+    color                       = "#e8a0bf"
+    font                        = "DejaVu Sans Regular 12"
+}
+
+# --- Bottom branding ---
++ label {
+    left                        = 30%
+    top                         = 82%
+    width                       = 40%
+    align                       = "center"
+    text                        = "SerikaOS • Rolling • Privacy-focused"
+    color                       = "#2a2b3e"
+    font                        = "DejaVu Sans Regular 11"
+}

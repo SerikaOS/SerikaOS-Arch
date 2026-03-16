@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=SerikaOS Welcome
+Comment=Welcome to SerikaOS Live
+Exec=/usr/local/bin/serikaos-welcome
+Icon=system-help
+Terminal=false
+Categories=System;
+X-KDE-autostart-phase=2
+X-GNOME-Autostart-enabled=true
