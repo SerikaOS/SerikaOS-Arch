@@ -3,10 +3,10 @@
  * Frosted glass panel with animations
  * Themed around Serika Kuromi — Blue Archive
  * ============================================================ */
-import QtQuick
-import QtQuick.Controls as QQC2
-import QtQuick.Layouts
-import Qt5Compat.GraphicalEffects
+import QtQuick 2.15
+import QtQuick.Controls 2.15 as QQC2
+import QtQuick.Layouts 1.15
+import QtGraphicalEffects 1.15
 import SddmComponents 2.0
 
 Rectangle {

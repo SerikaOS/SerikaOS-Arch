@@ -183,6 +183,10 @@ mkdir -p "$AIROOTFS/usr/share/sddm/themes/SerikaOS"
 cp -r /serikaos/sddm-theme/* "$AIROOTFS/usr/share/sddm/themes/SerikaOS/" 2>/dev/null || true
 
 # --- 9. Wallpapers & media ---
+echo "[*] Packaging SerikaOS media assets..."
+mkdir -p "$AIROOTFS/usr/share/serikaos"
+cp -r /serikaos/built-in-media/* "$AIROOTFS/usr/share/serikaos/" 2>/dev/null || true
+cp "$AIROOTFS/usr/share/serikaos/logo/SerikaOS-LogoText.png" "$AIROOTFS/usr/share/serikaos/logo.png" 2>/dev/null || true
 echo "[*] Installing media assets..."
 mkdir -p "$AIROOTFS/usr/share/wallpapers/SerikaOS"
 cp -r /serikaos/built-in-media/wallpapers/* "$AIROOTFS/usr/share/wallpapers/SerikaOS/" 2>/dev/null || true
@@ -343,7 +347,7 @@ EOF
 echo "[*] Generating installer branding images..."
 BRANDING_DIR="$AIROOTFS/etc/calamares/branding/serikaos"
 
-LOGO_SRC="/serikaos/built-in-media/logo/serikaos-logo.png"
+LOGO_SRC="/serikaos/built-in-media/logo/SerikaOS-LogoText.png"
 WALL_SRC="/serikaos/built-in-media/wallpapers/boot.jpg"
 
 if command -v magick &>/dev/null; then
@@ -475,7 +479,7 @@ DOCUMENTATION_URL="https://wiki.archlinux.org"
 SUPPORT_URL="https://github.com/serikaos/issues"
 BUG_REPORT_URL="https://github.com/serikaos/issues"
 PRIVACY_POLICY_URL="https://github.com/serikaos"
-LOGO=serikaos
+LOGO=serikaos-logo
 OSREOF
 
 cat > /etc/lsb-release << 'LSBREOF'
@@ -487,11 +491,12 @@ LSBREOF
 
 chmod 644 /etc/os-release /etc/lsb-release
 
-if [[ -f /usr/share/serikaos/boot-logo.png ]]; then
-    cp /usr/share/serikaos/boot-logo.png /usr/share/plymouth/themes/spinner/watermark.png
-elif [[ -f /usr/share/serikaos/logo.png ]]; then
-    cp /usr/share/serikaos/logo.png /usr/share/plymouth/themes/spinner/watermark.png
-fi
+# Force SerikaOS logo for Plymouth (boot splash)
+# Force SerikaOS logo for Plymouth (boot splash)
+mkdir -p /usr/share/plymouth/themes/spinner
+cp /usr/share/serikaos/logo/SerikaOS-LogoText.png /usr/share/plymouth/themes/spinner/watermark.png 2>/dev/null || true
+cp /usr/share/serikaos/logo/SerikaOS-LogoText.png /usr/share/pixmaps/archlinux-logo.png 2>/dev/null || true
+cp /usr/share/serikaos/logo/SerikaOS-LogoText.png /usr/share/pixmaps/serikaos-logo.png 2>/dev/null || true
 
 # Copy installer desktop shortcut to liveuser Desktop
 cp /usr/share/applications/serikaos-installer.desktop /home/liveuser/Desktop/ 2>/dev/null || true
