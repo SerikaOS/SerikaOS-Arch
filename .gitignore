@@ -1,0 +1,25 @@
+# Build outputs
+out/
+*.iso
+*.iso.sha256
+
+# Archiso work directory (if local)
+work/
+archiso-work/
+
+# Python cache
+__pycache__/
+*.pyc
+
+# System / IDE
+.DS_Store
+.vscode/
+.idea/
+
+# Local repo artifacts
+serikaos-repo/
+*.db
+*.db.tar.gz
+*.files
+*.files.tar.gz
+*.pkg.tar.zst
