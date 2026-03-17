@@ -180,7 +180,7 @@ Rectangle {
                         implicitHeight: contentHeight
                         model: sessionBox.popup.visible ? sessionBox.delegateModel : null
                         currentIndex: sessionBox.highlightedIndex
-                        ScrollIndicator.vertical: ScrollIndicator { }
+                        QQC2.ScrollIndicator.vertical: QQC2.ScrollIndicator { }
                     }
 
                     background: Rectangle {

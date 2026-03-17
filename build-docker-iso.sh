@@ -9,6 +9,10 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 OUT_DIR="${SCRIPT_DIR}/out"
+WORK_DIR="${SCRIPT_DIR}/work"
+CACHE_DIR="${SCRIPT_DIR}/build-cache"
+YAY_CACHE="${CACHE_DIR}/yay"
+PACMAN_CACHE="${CACHE_DIR}/pacman"
 
 # Colors
 PINK='\033[38;2;232;160;191m'
@@ -41,7 +45,14 @@ if ! command -v docker &>/dev/null; then
     exit 1
 fi
 
-mkdir -p "${OUT_DIR}"
+mkdir -p "${OUT_DIR}" "${WORK_DIR}" "${YAY_CACHE}" "${PACMAN_CACHE}" "${CACHE_DIR}/repo" "${CACHE_DIR}/tmp"
+
+# Always start fresh (work dir + profile cache must be clean for mkarchiso)
+# AUR packages and pacman cache are preserved to speed up rebuilds
+echo -e "${TEAL}[*]${RESET} Cleaning previous build artifacts..."
+rm -rf "${WORK_DIR:?}"/*
+rm -rf "${CACHE_DIR}/tmp"/*
+rm -f "${OUT_DIR}"/serikaos-*.iso
 
 # Pull latest Arch image
 echo -e "${TEAL}[*]${RESET} Pulling archlinux:latest..."
@@ -49,14 +60,25 @@ docker pull archlinux:latest 2>&1 | tail -3
 
 # Run containerized build
 echo -e "${TEAL}[*]${RESET} Starting build inside Arch Linux container..."
+echo -e "${DIM}    Memory Limit: 12GB | Swap Limit: 14GB${RESET}"
 echo -e "${DIM}    This handles all dependencies automatically.${RESET}"
 echo ""
 
 docker run --rm --privileged \
+    --memory="12g" \
+    --memory-swap="14g" \
     -v "${SCRIPT_DIR}:/serikaos:ro" \
     -v "${OUT_DIR}:/out" \
+    -v "${WORK_DIR}:/work" \
+    -v "${YAY_CACHE}:/home/builduser/.cache/yay" \
+    -v "${PACMAN_CACHE}:/var/cache/pacman/pkg" \
+    -v "${CACHE_DIR}/repo:/serikaos-repo" \
+    -v "${CACHE_DIR}/tmp:/tmp/serikaos-profile" \
     -e ISO_VERSION="${ISO_VERSION}" \
     -e ISO_LABEL="${ISO_LABEL}" \
+    -e SERIKA_WORK_DIR="/work" \
+    -e SERIKA_OUT_DIR="/out" \
+    -e SERIKA_PROFILE_DIR="/tmp/serikaos-profile" \
     --network host \
     archlinux:latest \
     /bin/bash /serikaos/inner-build.sh
