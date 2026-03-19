@@ -196,6 +196,7 @@ cp "$THEME_DIR/fonts/"*.pf2 "$PROFILE_DIR/grub/fonts/" 2>/dev/null || true
 
 # --- 8. SDDM theme ---
 echo "[*] Installing SDDM theme..."
+mkdir -p "$AIROOTFS/usr/share/sddm/themes/SerikaOS"
 cp -r /serikaos/sddm-theme/* "$AIROOTFS/usr/share/sddm/themes/SerikaOS/" 2>/dev/null || true
 if [[ -f "$AIROOTFS/usr/share/sddm/themes/SerikaOS/Logo.png" ]]; then
     magick "$AIROOTFS/usr/share/sddm/themes/SerikaOS/Logo.png" -resize 600x "$AIROOTFS/usr/share/sddm/themes/SerikaOS/Logo.png" 2>/dev/null || true
