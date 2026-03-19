@@ -97,9 +97,14 @@ breeze
 breeze-gtk
 kde-gtk-config
 
-# ── Calamares Installer ──
+# ── Calamares Installer & Qt 6 ──
 calamares
 arch-install-scripts
+qt6-base
+qt6-declarative
+qt6-svg
+qt6-wayland
+qt6-5compat
 qt5-base
 qt5-declarative
 qt5-svg

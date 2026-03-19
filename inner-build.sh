@@ -196,8 +196,10 @@ cp "$THEME_DIR/fonts/"*.pf2 "$PROFILE_DIR/grub/fonts/" 2>/dev/null || true
 
 # --- 8. SDDM theme ---
 echo "[*] Installing SDDM theme..."
-mkdir -p "$AIROOTFS/usr/share/sddm/themes/SerikaOS"
 cp -r /serikaos/sddm-theme/* "$AIROOTFS/usr/share/sddm/themes/SerikaOS/" 2>/dev/null || true
+if [[ -f "$AIROOTFS/usr/share/sddm/themes/SerikaOS/Logo.png" ]]; then
+    magick "$AIROOTFS/usr/share/sddm/themes/SerikaOS/Logo.png" -resize 600x "$AIROOTFS/usr/share/sddm/themes/SerikaOS/Logo.png" 2>/dev/null || true
+fi
 
 # --- 9. Wallpapers & media ---
 echo "[*] Installing media assets..."
@@ -217,17 +219,40 @@ mkdir -p "$AIROOTFS/usr/share/serikaos"
 cp /serikaos/branding/ascii-logo.txt "$AIROOTFS/usr/share/serikaos/" 2>/dev/null || true
 cp /serikaos/built-in-media/logo/serikaos-logo.png "$AIROOTFS/usr/share/serikaos/logo.png" 2>/dev/null || true
 
-# Boot logo asset (used by Plymouth customization in chroot)
-# Use the pre-built LogoText.png as primary, with ImageMagick fallback
+# Boot logo asset (used by Plymouth and SDDM)
 LOGO_TEXT="/serikaos/built-in-media/logo/SerikaOS-LogoText.png"
+mkdir -p "$AIROOTFS/usr/share/serikaos"
+mkdir -p "$AIROOTFS/usr/share/plymouth/themes/serika"
+
 if [[ -f "$LOGO_TEXT" ]]; then
+    # Plymouth logo (needs to be smaller)
+    magick "$LOGO_TEXT" -resize 450x "$AIROOTFS/usr/share/plymouth/themes/serika/watermark.png" 2>/dev/null || true
+    # Global boot logo for firstboot backup
     cp "$LOGO_TEXT" "$AIROOTFS/usr/share/serikaos/boot-logo.png"
 elif command -v magick &>/dev/null; then
     magick -size 900x220 xc:none \
         -font DejaVu-Sans-Bold -pointsize 120 -fill white -gravity center -annotate -130+0 "Serika" \
         -font DejaVu-Sans-Bold -pointsize 120 -fill "#e8a0bf" -gravity center -annotate +260+0 "OS" \
-        "$AIROOTFS/usr/share/serikaos/boot-logo.png" 2>/dev/null || true
+        -resize 450x "$AIROOTFS/usr/share/plymouth/themes/serika/watermark.png" 2>/dev/null || true
 fi
+
+# Define custom Plymouth theme (prevents conflicts with spinner)
+cat > "$AIROOTFS/usr/share/plymouth/themes/serika/serika.plymouth" << 'EOF'
+[Plymouth Theme]
+Name=SerikaOS
+Description=SerikaOS spinner theme
+ModuleName=two-step
+
+[two-step]
+ImageDir=/usr/share/plymouth/themes/serika
+HorizontalAlignment=0.5
+VerticalAlignment=0.5
+Transition=fade
+TransitionDuration=0.5
+
+[spinner]
+Watermark=watermark.png
+EOF
 
 # NOTE: Plymouth/pixmap overrides happen INSIDE customize_airootfs.sh (after pacman)
 # to avoid conflicting with the filesystem and plymouth packages.
@@ -307,7 +332,7 @@ ENDTEXT
 MENU LABEL Try SerikaOS live medium (x86_64, BIOS)
 LINUX /arch/boot/x86_64/vmlinuz-linux
 INITRD /arch/boot/x86_64/initramfs-linux.img
-APPEND archisobasedir=arch archisolabel=${ISO_LABEL:-SERIKAOS} quiet splash loglevel=3 rd.udev.log_priority=3 vt.global_cursor_default=0
+APPEND archisobasedir=arch archisolabel=${ISO_LABEL:-SERIKAOS} quiet splash plymouth.theme=serika loglevel=3 rd.udev.log_priority=3 vt.global_cursor_default=0
 
 LABEL serika-install
 TEXT HELP
@@ -317,7 +342,7 @@ ENDTEXT
 MENU LABEL Install SerikaOS (x86_64, BIOS)
 LINUX /arch/boot/x86_64/vmlinuz-linux
 INITRD /arch/boot/x86_64/initramfs-linux.img
-APPEND archisobasedir=arch archisolabel=${ISO_LABEL:-SERIKAOS} systemd.unit=graphical.target quiet splash loglevel=3 rd.udev.log_priority=3 vt.global_cursor_default=0
+APPEND archisobasedir=arch archisolabel=${ISO_LABEL:-SERIKAOS} systemd.unit=graphical.target quiet splash plymouth.theme=serika loglevel=3 rd.udev.log_priority=3 vt.global_cursor_default=0
 
 LABEL serika-safe
 TEXT HELP
@@ -326,7 +351,7 @@ ENDTEXT
 MENU LABEL SerikaOS safe graphics mode
 LINUX /arch/boot/x86_64/vmlinuz-linux
 INITRD /arch/boot/x86_64/initramfs-linux.img
-APPEND archisobasedir=arch archisolabel=${ISO_LABEL:-SERIKAOS} nomodeset quiet splash loglevel=3 rd.udev.log_priority=3 vt.global_cursor_default=0
+APPEND archisobasedir=arch archisolabel=${ISO_LABEL:-SERIKAOS} nomodeset quiet splash plymouth.theme=serika loglevel=3 rd.udev.log_priority=3 vt.global_cursor_default=0
 EOF
 
 cat > "$PROFILE_DIR/syslinux/archiso_tail.cfg" << EOF
@@ -500,34 +525,30 @@ export GDK_SCALE=1
 export GDK_DPI_SCALE=1
 SCALEEOF
 
-# --- Plymouth config ---
-mkdir -p "$STAGING/etc/plymouth"
-cat > "$STAGING/etc/plymouth/plymouthd.conf" << 'PLYEOF'
+# --- Plymouth config (moved back to AIROOTFS to ensure it's in initramfs) ---
+mkdir -p "$AIROOTFS/etc/plymouth"
+cat > "$AIROOTFS/etc/plymouth/plymouthd.conf" << 'PLYEOF'
 [Daemon]
-Theme=spinner
+Theme=serika
 ShowDelay=0
 DeviceTimeout=8
 PLYEOF
 
-# --- liveuser via passwd/group/shadow (static user creation) ---
+# --- liveuser via sysusers.d (avoids passwd conflicts) ---
+mkdir -p "$AIROOTFS/etc/sysusers.d"
+cat > "$AIROOTFS/etc/sysusers.d/liveuser.conf" << 'SYSUSEREOF'
+u liveuser 1000 "SerikaOS Live User" /home/liveuser /bin/bash
+m liveuser wheel
+m liveuser audio
+m liveuser video
+m liveuser optical
+m liveuser storage
+m liveuser network
+m liveuser autologin
+SYSUSEREOF
+
+# Keep staging shadow/gshadow for initial permission setup
 mkdir -p "$STAGING/etc"
-cat > "$STAGING/etc/passwd" << 'PWEOF'
-root:x:0:0:root:/root:/bin/bash
-liveuser:x:1000:1000:SerikaOS Live User:/home/liveuser:/bin/bash
-PWEOF
-
-cat > "$STAGING/etc/group" << 'GRPEOF'
-root:x:0:
-wheel:x:10:liveuser
-audio:x:11:liveuser
-video:x:12:liveuser
-optical:x:14:liveuser
-storage:x:15:liveuser
-network:x:90:liveuser
-autologin:x:969:liveuser
-liveuser:x:1000:
-GRPEOF
-
 cat > "$STAGING/etc/shadow" << 'SHEOF'
 root::14871::::::
 liveuser::14871:0:99999:7:::
@@ -585,14 +606,11 @@ cat > /home/liveuser/.local/share/trusted-desktop-files << 'TRUSTEOF'
 TRUSTEOF
 chown -R 1000:1000 /home/liveuser/.local
 
-# Overwrite Arch logos with SerikaOS branding (after packages are installed)
+# Overwrite branding (backup/fallback branding)
 if [[ -f /usr/share/serikaos/boot-logo.png ]]; then
-    cp /usr/share/serikaos/boot-logo.png /usr/share/plymouth/themes/spinner/watermark.png 2>/dev/null || true
     cp /usr/share/serikaos/boot-logo.png /usr/share/pixmaps/archlinux-logo.png 2>/dev/null || true
     cp /usr/share/serikaos/boot-logo.png /usr/share/pixmaps/archlinux-logo-text.png 2>/dev/null || true
-    cp /usr/share/serikaos/boot-logo.png /usr/share/pixmaps/archlinux-logo-text-dark.png 2>/dev/null || true
 elif [[ -f /usr/share/serikaos/logo.png ]]; then
-    cp /usr/share/serikaos/logo.png /usr/share/plymouth/themes/spinner/watermark.png 2>/dev/null || true
     cp /usr/share/serikaos/logo.png /usr/share/pixmaps/archlinux-logo.png 2>/dev/null || true
 fi
 
@@ -740,23 +758,23 @@ set default=1
 
 menuentry '  Try SerikaOS — Live Session' --class serikaos --class linux {
     set gfxpayload=keep
-    linux (\${root})/arch/boot/x86_64/vmlinuz-linux archisobasedir=arch archisolabel=${ISO_LABEL:-SERIKAOS} cow_spacesize=2G quiet splash loglevel=3 rd.udev.log_priority=3 vt.global_cursor_default=0
+    linux (\${root})/arch/boot/x86_64/vmlinuz-linux archisobasedir=arch archisolabel=${ISO_LABEL:-SERIKAOS} cow_spacesize=2G quiet splash plymouth.theme=serika loglevel=3 rd.udev.log_priority=3 vt.global_cursor_default=0
     initrd (\${root})/arch/boot/x86_64/initramfs-linux.img
 }
 
 menuentry '  Install SerikaOS' --class serikaos --class linux {
     set gfxpayload=keep
-    linux (\${root})/arch/boot/x86_64/vmlinuz-linux archisobasedir=arch archisolabel=${ISO_LABEL:-SERIKAOS} cow_spacesize=2G systemd.unit=graphical.target quiet splash loglevel=3 rd.udev.log_priority=3 vt.global_cursor_default=0
+    linux (\${root})/arch/boot/x86_64/vmlinuz-linux archisobasedir=arch archisolabel=${ISO_LABEL:-SERIKAOS} cow_spacesize=2G systemd.unit=graphical.target quiet splash plymouth.theme=serika loglevel=3 rd.udev.log_priority=3 vt.global_cursor_default=0
     initrd (\${root})/arch/boot/x86_64/initramfs-linux.img
 }
 
 submenu '  Advanced Options >' --class submenu {
     menuentry '  SerikaOS (Safe Graphics)' --class serikaos {
-        linux (\${root})/arch/boot/x86_64/vmlinuz-linux archisobasedir=arch archisolabel=${ISO_LABEL:-SERIKAOS} nomodeset cow_spacesize=2G quiet splash loglevel=3 rd.udev.log_priority=3 vt.global_cursor_default=0
+        linux (\${root})/arch/boot/x86_64/vmlinuz-linux archisobasedir=arch archisolabel=${ISO_LABEL:-SERIKAOS} nomodeset cow_spacesize=2G quiet splash plymouth.theme=serika loglevel=3 rd.udev.log_priority=3 vt.global_cursor_default=0
         initrd (\${root})/arch/boot/x86_64/initramfs-linux.img
     }
     menuentry '  SerikaOS (Copy to RAM)' --class serikaos {
-        linux (\${root})/arch/boot/x86_64/vmlinuz-linux archisobasedir=arch archisolabel=${ISO_LABEL:-SERIKAOS} copytoram cow_spacesize=2G quiet splash loglevel=3 rd.udev.log_priority=3 vt.global_cursor_default=0
+        linux (\${root})/arch/boot/x86_64/vmlinuz-linux archisobasedir=arch archisolabel=${ISO_LABEL:-SERIKAOS} copytoram cow_spacesize=2G quiet splash plymouth.theme=serika loglevel=3 rd.udev.log_priority=3 vt.global_cursor_default=0
         initrd (\${root})/arch/boot/x86_64/initramfs-linux.img
     }
     menuentry '  Boot from local disk' --class hd {
