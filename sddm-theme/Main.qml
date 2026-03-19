@@ -2,10 +2,10 @@
  * SerikaOS — Premium SDDM Login Theme (Astronaut Mod)
  * Left-aligned frosted glass sidebar with modern typography
  * ============================================================ */
-import QtQuick
-import QtQuick.Controls as QQC2
-import QtQuick.Layouts
-import Qt5Compat.GraphicalEffects
+import QtQuick 2.15
+import QtQuick.Controls 2.15 as QQC2
+import QtQuick.Layouts 1.15
+import Qt5Compat.GraphicalEffects 6.0
 import SddmComponents 2.0
 
 Rectangle {
