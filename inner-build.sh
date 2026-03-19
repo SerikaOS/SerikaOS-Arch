@@ -414,8 +414,8 @@ RememberLastSession=false
 SDDMCFGEOF
 
 # --- PAM: SDDM autologin ---
-mkdir -p "$AIROOTFS/etc/pam.d"
-cat > "$AIROOTFS/etc/pam.d/sddm-autologin" << 'PAMEOF'
+mkdir -p "$STAGING/etc/pam.d"
+cat > "$STAGING/etc/pam.d/sddm-autologin" << 'PAMEOF'
 #%PAM-1.0
 auth     required pam_env.so
 auth     required pam_permit.so
@@ -427,7 +427,7 @@ session  required pam_env.so
 session  required pam_permit.so
 PAMEOF
 
-cat > "$AIROOTFS/etc/pam.d/sddm" << 'PAMEOF2'
+cat > "$STAGING/etc/pam.d/sddm" << 'PAMEOF2'
 #%PAM-1.0
 auth       sufficient   pam_unix.so nullok try_first_pass
 auth       required     pam_deny.so
@@ -457,7 +457,7 @@ polkit.addRule(function(action, subject) {
 POLKITEOF
 
 # --- OS branding ---
-cat > "$AIROOTFS/etc/os-release" << 'OSREOF'
+cat > "$STAGING/etc/os-release" << 'OSREOF'
 NAME="SerikaOS"
 PRETTY_NAME="SerikaOS"
 ID=serikaos
@@ -472,7 +472,7 @@ PRIVACY_POLICY_URL="https://github.com/serikaos"
 LOGO=serikaos
 OSREOF
 
-cat > "$AIROOTFS/etc/lsb-release" << 'LSBREOF'
+cat > "$STAGING/etc/lsb-release" << 'LSBREOF'
 DISTRIB_ID=SerikaOS
 DISTRIB_RELEASE=rolling
 DISTRIB_DESCRIPTION="SerikaOS Rolling platform"
@@ -480,7 +480,7 @@ DISTRIB_CODENAME=serika
 LSBREOF
 
 # --- Environment variables ---
-cat > "$AIROOTFS/etc/environment" << 'ENVEOF'
+cat > "$STAGING/etc/environment" << 'ENVEOF'
 QT_AUTO_SCREEN_SCALE_FACTOR=0
 QT_ENABLE_HIGHDPI_SCALING=0
 QT_SCALE_FACTOR=1
@@ -501,8 +501,8 @@ export GDK_DPI_SCALE=1
 SCALEEOF
 
 # --- Plymouth config ---
-mkdir -p "$AIROOTFS/etc/plymouth"
-cat > "$AIROOTFS/etc/plymouth/plymouthd.conf" << 'PLYEOF'
+mkdir -p "$STAGING/etc/plymouth"
+cat > "$STAGING/etc/plymouth/plymouthd.conf" << 'PLYEOF'
 [Daemon]
 Theme=spinner
 ShowDelay=0
@@ -510,13 +510,13 @@ DeviceTimeout=8
 PLYEOF
 
 # --- liveuser via passwd/group/shadow (static user creation) ---
-mkdir -p "$AIROOTFS/etc"
-cat > "$AIROOTFS/etc/passwd" << 'PWEOF'
+mkdir -p "$STAGING/etc"
+cat > "$STAGING/etc/passwd" << 'PWEOF'
 root:x:0:0:root:/root:/bin/bash
 liveuser:x:1000:1000:SerikaOS Live User:/home/liveuser:/bin/bash
 PWEOF
 
-cat > "$AIROOTFS/etc/group" << 'GRPEOF'
+cat > "$STAGING/etc/group" << 'GRPEOF'
 root:x:0:
 wheel:x:10:liveuser
 audio:x:11:liveuser
@@ -528,12 +528,12 @@ autologin:x:969:liveuser
 liveuser:x:1000:
 GRPEOF
 
-cat > "$AIROOTFS/etc/shadow" << 'SHEOF'
+cat > "$STAGING/etc/shadow" << 'SHEOF'
 root::14871::::::
 liveuser::14871:0:99999:7:::
 SHEOF
 
-cat > "$AIROOTFS/etc/gshadow" << 'GSHEOF'
+cat > "$STAGING/etc/gshadow" << 'GSHEOF'
 root:::
 wheel:::liveuser
 audio:::liveuser
