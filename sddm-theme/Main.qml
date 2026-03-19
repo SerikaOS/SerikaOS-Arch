@@ -5,7 +5,6 @@
 import QtQuick 2.15
 import QtQuick.Controls 2.15 as QQC2
 import QtQuick.Layouts 1.15
-import Qt5Compat.GraphicalEffects 6.0
 import SddmComponents 2.0
 
 Rectangle {
@@ -24,26 +23,24 @@ Rectangle {
         smooth: true
     }
 
-    /* ── Sidebar Glass Layout ── */
+    /* ── Sidebar Layout ── */
     Rectangle {
         id: sidebar
         anchors.left: parent.left
-        width: Math.max(400, parent.width * 0.25)
+        width: Math.max(400, parent.width * 0.28)
         height: parent.height
-        color: "#B00a0b16" // Semi-transparent navy
-
-        /* ── Glass Effect ── */
-        layer.enabled: true
-        layer.effect: FastBlur {
-            radius: 40
-        }
         
+        gradient: Gradient {
+            GradientStop { position: 0.0; color: "#f00a0b16" }
+            GradientStop { position: 1.0; color: "#e01a1b2e" }
+        }
+
         /* ── Sidebar Border ── */
         Rectangle {
             anchors.right: parent.right
             width: 1
             height: parent.height
-            color: "#305cc6d0"
+            color: "#405cc6d0"
         }
     }
 
@@ -55,25 +52,26 @@ Rectangle {
         width: sidebar.width
         anchors.leftMargin: 40
         anchors.rightMargin: 40
-        anchors.topMargin: 80
+        anchors.topMargin: 100
         anchors.bottomMargin: 60
         spacing: 32
 
         /* ── Header / Branding ── */
         Column {
             Layout.fillWidth: true
-            spacing: 12
+            spacing: 16
             
             Image {
+                id: logoImage
                 source: "Logo.png"
-                Layout.preferredWidth: parent.width * 0.8
+                width: parent.width * 0.85
                 fillMode: Image.PreserveAspectFit
                 smooth: true
             }
             
             Text {
                 text: "Rolling • High Performance"
-                font.pixelSize: 14
+                font.pixelSize: 12
                 font.letterSpacing: 1.5
                 color: "#5cc6d0" // Serika Teal
                 opacity: 0.8

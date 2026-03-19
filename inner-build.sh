@@ -199,7 +199,8 @@ echo "[*] Installing SDDM theme..."
 mkdir -p "$AIROOTFS/usr/share/sddm/themes/SerikaOS"
 cp -r /serikaos/sddm-theme/* "$AIROOTFS/usr/share/sddm/themes/SerikaOS/" 2>/dev/null || true
 if [[ -f "$AIROOTFS/usr/share/sddm/themes/SerikaOS/Logo.png" ]]; then
-    magick "$AIROOTFS/usr/share/sddm/themes/SerikaOS/Logo.png" -resize 600x "$AIROOTFS/usr/share/sddm/themes/SerikaOS/Logo.png" 2>/dev/null || true
+    # Resize to 320px width to ensure it ALWAYS fits the sidebar
+    magick "$AIROOTFS/usr/share/sddm/themes/SerikaOS/Logo.png" -resize 320x "$AIROOTFS/usr/share/sddm/themes/SerikaOS/Logo.png" 2>/dev/null || true
 fi
 
 # --- 9. Wallpapers & media ---
@@ -426,7 +427,7 @@ mkdir -p "$AIROOTFS/etc/sddm.conf.d"
 cat > "$AIROOTFS/etc/sddm.conf.d/autologin.conf" << 'SDDMCFGEOF'
 [Autologin]
 User=liveuser
-Session=plasma.desktop
+Session=plasma
 Relogin=false
 
 [Theme]
@@ -437,6 +438,11 @@ MinimumUid=1000
 MaximumUid=65000
 RememberLastUser=false
 RememberLastSession=false
+
+[General]
+InputMethod=
+HaltCommand=/usr/bin/systemctl poweroff
+RebootCommand=/usr/bin/systemctl reboot
 SDDMCFGEOF
 
 # --- PAM: SDDM autologin ---
