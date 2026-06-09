@@ -758,20 +758,21 @@ insmod gfxmenu
 insmod png
 insmod jpeg
 
-set gfxmode=auto
+set gfxmode=1024x768x32,1024x768,800x600,auto
 set gfxpayload=keep
 terminal_output gfxterm
 
-# Load fonts from the GRUB prefix (which is /boot/grub on the ISO)
-loadfont "\${prefix}/fonts/dejavu_11.pf2"
-loadfont "\${prefix}/fonts/dejavu_12.pf2"
-loadfont "\${prefix}/fonts/dejavu_14.pf2"
-loadfont "\${prefix}/fonts/dejavu_16.pf2"
-loadfont "\${prefix}/fonts/dejavu_24.pf2"
-loadfont "\${prefix}/fonts/dejavu_bold_16.pf2"
-loadfont "\${prefix}/fonts/dejavu_bold_24.pf2"
+# Load fonts using explicit absolute paths on the ISO
+loadfont "/boot/grub/fonts/dejavu_11.pf2"
+loadfont "/boot/grub/fonts/dejavu_12.pf2"
+loadfont "/boot/grub/fonts/dejavu_14.pf2"
+loadfont "/boot/grub/fonts/dejavu_16.pf2"
+loadfont "/boot/grub/fonts/dejavu_24.pf2"
+loadfont "/boot/grub/fonts/dejavu_bold_16.pf2"
+loadfont "/boot/grub/fonts/dejavu_bold_24.pf2"
 
-set theme="\${prefix}/themes/SerikaOS/theme.txt"
+set theme="/boot/grub/themes/SerikaOS/theme.txt"
+export theme
 set timeout=3
 set default=1
 
