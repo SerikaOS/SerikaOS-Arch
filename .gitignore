@@ -7,6 +7,9 @@ out/
 work/
 archiso-work/
 
+# Build Cache
+build-cache/
+
 # Python cache
 __pycache__/
 *.pyc

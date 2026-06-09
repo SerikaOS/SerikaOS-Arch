@@ -90,6 +90,11 @@ libxkbcommon
 calamares
 ckbcomp
 arch-install-scripts
+qt6-base
+qt6-declarative
+qt6-svg
+qt6-wayland
+qt6-5compat
 qt5-base
 qt5-declarative
 qt5-svg
@@ -100,7 +105,6 @@ kpmcore
 boost-libs
 icu
 polkit-qt5
-qt6-5compat
 
 # ── Theming ──
 papirus-icon-theme

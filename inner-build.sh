@@ -15,49 +15,75 @@ echo ""
 echo "[*] Installing build dependencies..."
 pacman -Sy --noconfirm archiso grub ttf-dejavu imagemagick base-devel git wget >/dev/null 2>&1
 
-# --- 2. Build Calamares and ckbcomp from AUR ---
+# --- 2. Build Calamares from AUR (pure Arch, no third-party repos) ---
 echo "[*] Checking for cached packages or building from AUR..."
 mkdir -p /serikaos-repo
 
+# If GitHub Action has restored the cache to /out/packages, copy them to /serikaos-repo
 if [[ -d "/out/packages" ]] && ls /out/packages/*.pkg.tar.zst &>/dev/null; then
-    echo "[*] Found cached packages in /out/packages. Loading..."
+    echo "[*] Copying cached packages from /out/packages to repository..."
     cp /out/packages/*.pkg.tar.zst /serikaos-repo/
+fi
+
+# Check if we already have the packages cached (speeds up rebuilds)
+if ls /serikaos-repo/calamares-*.pkg.tar.zst &>/dev/null && \
+   ls /serikaos-repo/ckbcomp-*.pkg.tar.zst &>/dev/null; then
+    echo "[*] AUR packages found in local repo cache, skipping build phase."
 else
-    echo "[*] No cached packages found. Compiling from AUR..."
+    echo "[*] Building Calamares from AUR..."
     pacman-key --init
+    pacman -S --noconfirm --needed base-devel git >/dev/null 2>&1
+
+    # Create a non-root build user
     useradd -m builduser 2>/dev/null || true
     echo "builduser ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/builduser
+    chown -R builduser:builduser /home/builduser
 
-    # Install yay-bin for fast AUR package management
+    # Install yay
     sudo -u builduser bash -c '
         cd /home/builduser
-        git clone https://aur.archlinux.org/yay-bin.git
+        if [[ ! -d yay-bin ]]; then
+            git clone https://aur.archlinux.org/yay-bin.git
+        fi
         cd yay-bin && makepkg -si --noconfirm
     '
 
-    # Build calamares and ckbcomp from AUR
+    # Build calamares and dependencies from AUR
+    mkdir -p /home/builduser/build
+    chown builduser:builduser /home/builduser/build
     sudo -u builduser bash -c '
-        yay -S --noconfirm calamares ckbcomp
+        yay -S --noconfirm calamares ckbcomp qt5-xmlpatterns
     '
 
-    # Save built packages to /out/packages for future runs/caching
-    mkdir -p /out/packages
+    # Create local repo from built packages
+    echo "[*] Creating local SerikaOS package repository..."
     find /home/builduser/.cache/yay -name "*.pkg.tar.zst" -exec cp {} /serikaos-repo/ \;
+
+    # Also save to /out/packages for GitHub Actions caching
+    mkdir -p /out/packages
     find /home/builduser/.cache/yay -name "*.pkg.tar.zst" -exec cp {} /out/packages/ \;
 fi
 
-# Create local repo database
-echo "[*] Creating local SerikaOS package repository..."
-repo-add /serikaos-repo/serikaos-local.db.tar.gz /serikaos-repo/*.pkg.tar.zst
-ln -sf serikaos-local.db.tar.gz /serikaos-repo/serikaos-local.db
-ln -sf serikaos-local.files.tar.gz /serikaos-repo/serikaos-local.files
+# Refresh local repo index
+if ls /serikaos-repo/*.pkg.tar.zst &>/dev/null; then
+    echo "[*] Refreshing local repository index..."
+    repo-add /serikaos-repo/serikaos-local.db.tar.gz /serikaos-repo/*.pkg.tar.zst
+    ln -sf serikaos-local.db.tar.gz /serikaos-repo/serikaos-local.db
+    ln -sf serikaos-local.files.tar.gz /serikaos-repo/serikaos-local.files
+fi
 
 # --- 3. Copy releng base profile ---
-PROFILE_DIR="/tmp/serikaos-profile"
-cp -r /usr/share/archiso/configs/releng "$PROFILE_DIR"
+PROFILE_DIR="${SERIKA_PROFILE_DIR:-/tmp/serikaos-profile}"
+if [ -d "$PROFILE_DIR" ]; then
+    find "$PROFILE_DIR" -mindepth 1 -delete
+else
+    mkdir -p "$PROFILE_DIR"
+fi
+cp -a /usr/share/archiso/configs/releng/. "$PROFILE_DIR/"
 
 # --- 4. Use our pacman.conf and append local repo ---
 cp /serikaos/archiso-profile/pacman.conf "$PROFILE_DIR/pacman.conf"
+
 cat >> "$PROFILE_DIR/pacman.conf" << EOF
 
 [serikaos-local]
@@ -65,12 +91,20 @@ SigLevel = Optional TrustAll
 Server = file:///serikaos-repo
 EOF
 
-# --- 4.5. Replace package list with our minimal one ---
+# --- 5. Optimize mkinitcpio for ISO (Add Plymouth, remove PXE) ---
+echo "[*] Optimizing initramfs hooks..."
+mkdir -p "$PROFILE_DIR/airootfs/etc/mkinitcpio.conf.d"
+cat > "$PROFILE_DIR/airootfs/etc/mkinitcpio.conf.d/archiso.conf" << EOF
+HOOKS=(base udev plymouth microcode modconf kms memdisk archiso archiso_loop_mnt block filesystems keyboard)
+EOF
+
+
+
+# --- 5. Replace package list with our minimal one ---
 echo "[*] Setting up minimal package list..."
 cp /serikaos/archiso-profile/packages.x86_64 "$PROFILE_DIR/packages.x86_64"
 
-# --- 5. Profile definition ---
-echo "[*] Configuring profile..."
+# --- 6. Profile definition ---
 cat > "$PROFILE_DIR/profiledef.sh" << PROFILEDEF
 #!/usr/bin/env bash
 iso_name="serikaos"
@@ -83,13 +117,15 @@ buildmodes=("iso")
 bootmodes=(
     "bios.syslinux.mbr"
     "bios.syslinux.eltorito"
+    "uefi-ia32.grub.esp"
     "uefi-x64.grub.esp"
+    "uefi-ia32.grub.eltorito"
     "uefi-x64.grub.eltorito"
 )
 arch="x86_64"
 pacman_conf="pacman.conf"
 airootfs_image_type="squashfs"
-airootfs_image_tool_options=("-comp" "zstd" "-Xcompression-level" "15" "-b" "1M")
+airootfs_image_tool_options=("-comp" "zstd" "-Xcompression-level" "3" "-b" "1M")
 file_permissions=(
     ["/etc/shadow"]="0:0:400"
     ["/etc/gshadow"]="0:0:400"
@@ -99,54 +135,55 @@ file_permissions=(
 )
 PROFILEDEF
 
-# --- 6. Copy all airootfs customizations ---
-echo "[*] Copying SerikaOS customizations..."
+# --- 6. Stage SerikaOS customizations ---
+echo "[*] Staging SerikaOS customizations..."
 
 AIROOTFS="$PROFILE_DIR/airootfs"
+STAGING="$AIROOTFS/opt/serikaos-custom"
+mkdir -p "$STAGING/etc/calamares/branding/serikaos"
+mkdir -p "$STAGING/etc/calamares/modules"
+mkdir -p "$STAGING/usr/local/bin"
+mkdir -p "$STAGING/usr/share/grub/themes/SerikaOS"
 
 # Calamares config
-mkdir -p "$AIROOTFS/etc/calamares/branding/serikaos"
-mkdir -p "$AIROOTFS/etc/calamares/modules"
-cp /serikaos/archiso-profile/airootfs/etc/calamares/settings.conf "$AIROOTFS/etc/calamares/"
-cp /serikaos/archiso-profile/airootfs/etc/calamares/branding/serikaos/* "$AIROOTFS/etc/calamares/branding/serikaos/" 2>/dev/null || true
-cp /serikaos/archiso-profile/airootfs/etc/calamares/modules/* "$AIROOTFS/etc/calamares/modules/" 2>/dev/null || true
+cp /serikaos/archiso-profile/airootfs/etc/calamares/settings.conf "$STAGING/etc/calamares/" 2>/dev/null || true
+cp /serikaos/archiso-profile/airootfs/etc/calamares/branding/serikaos/* "$STAGING/etc/calamares/branding/serikaos/" 2>/dev/null || true
+cp /serikaos/archiso-profile/airootfs/etc/calamares/modules/* "$STAGING/etc/calamares/modules/" 2>/dev/null || true
 
-# OS branding files
-for f in os-release lsb-release hostname hosts locale.conf locale.gen issue; do
+# OS branding files (hostname, hosts, etc.)
+for f in hostname hosts locale.conf locale.gen issue; do
     if [[ -f "/serikaos/archiso-profile/airootfs/etc/${f}" ]]; then
-        cp "/serikaos/archiso-profile/airootfs/etc/${f}" "$AIROOTFS/etc/${f}"
+        cp "/serikaos/archiso-profile/airootfs/etc/${f}" "$STAGING/etc/${f}"
     fi
 done
 
 # Executable scripts
-mkdir -p "$AIROOTFS/usr/local/bin"
 for script in serikaos-installer serikaos-welcome; do
     if [[ -f "/serikaos/archiso-profile/airootfs/usr/local/bin/${script}" ]]; then
-        cp "/serikaos/archiso-profile/airootfs/usr/local/bin/${script}" "$AIROOTFS/usr/local/bin/"
-        chmod +x "$AIROOTFS/usr/local/bin/${script}"
+        cp "/serikaos/archiso-profile/airootfs/usr/local/bin/${script}" "$STAGING/usr/local/bin/"
     fi
 done
 
 # Desktop entries
-mkdir -p "$AIROOTFS/usr/share/applications"
-cp /serikaos/archiso-profile/airootfs/usr/share/applications/*.desktop "$AIROOTFS/usr/share/applications/" 2>/dev/null || true
+mkdir -p "$STAGING/usr/share/applications"
+cp /serikaos/archiso-profile/airootfs/usr/share/applications/*.desktop "$STAGING/usr/share/applications/" 2>/dev/null || true
 
-# Skel configs (fastfetch, hyprland, waybar, kde, autostart)
+# Skel configs
 if [[ -d "/serikaos/archiso-profile/airootfs/etc/skel" ]]; then
-    cp -r /serikaos/archiso-profile/airootfs/etc/skel "$AIROOTFS/etc/"
+    cp -r /serikaos/archiso-profile/airootfs/etc/skel "$STAGING/etc/"
 fi
 
 # Systemd services
 if [[ -d "/serikaos/archiso-profile/airootfs/etc/systemd" ]]; then
-    cp -r /serikaos/archiso-profile/airootfs/etc/systemd "$AIROOTFS/etc/"
+    cp -r /serikaos/archiso-profile/airootfs/etc/systemd "$STAGING/etc/"
 fi
 
-# --- 7. GRUB theme ---
-echo "[*] Installing GRUB theme..."
-THEME_DIR="$AIROOTFS/usr/share/grub/themes/SerikaOS"
-mkdir -p "$THEME_DIR"
+# GRUB theme
+THEME_DIR="$STAGING/usr/share/grub/themes/SerikaOS"
 cp -r /serikaos/grub-theme/* "$THEME_DIR/" 2>/dev/null || true
 rm -f "$THEME_DIR/install.sh"
+
+
 
 # Generate PF2 fonts
 if [[ -f /usr/share/fonts/TTF/DejaVuSans.ttf ]]; then
@@ -162,14 +199,21 @@ if [[ -f /usr/share/fonts/TTF/DejaVuSans-Bold.ttf ]]; then
     grub-mkfont -s 24 -o "$THEME_DIR/fonts/dejavu_bold_24.pf2" /usr/share/fonts/TTF/DejaVuSans-Bold.ttf
 fi
 
-# Copy theme into ISO boot grub dir too
+# Copy theme into ISO boot grub dir
 mkdir -p "$PROFILE_DIR/grub/themes/SerikaOS"
-cp -r "$THEME_DIR/"* "$PROFILE_DIR/grub/themes/SerikaOS/" 2>/dev/null || true
+cp -r "$THEME_DIR/"* "$PROFILE_DIR/grub/themes/SerikaOS/"
+# Also copy fonts to the actual grub fonts dir so they can be loaded before the theme
+mkdir -p "$PROFILE_DIR/grub/fonts"
+cp "$THEME_DIR/fonts/"*.pf2 "$PROFILE_DIR/grub/fonts/" 2>/dev/null || true
 
 # --- 8. SDDM theme ---
 echo "[*] Installing SDDM theme..."
 mkdir -p "$AIROOTFS/usr/share/sddm/themes/SerikaOS"
 cp -r /serikaos/sddm-theme/* "$AIROOTFS/usr/share/sddm/themes/SerikaOS/" 2>/dev/null || true
+if [[ -f "$AIROOTFS/usr/share/sddm/themes/SerikaOS/Logo.png" ]]; then
+    # Resize to 320px width to ensure it ALWAYS fits the sidebar
+    magick "$AIROOTFS/usr/share/sddm/themes/SerikaOS/Logo.png" -resize 320x "$AIROOTFS/usr/share/sddm/themes/SerikaOS/Logo.png" 2>/dev/null || true
+fi
 
 # --- 9. Wallpapers & media ---
 echo "[*] Installing media assets..."
@@ -189,13 +233,43 @@ mkdir -p "$AIROOTFS/usr/share/serikaos"
 cp /serikaos/branding/ascii-logo.txt "$AIROOTFS/usr/share/serikaos/" 2>/dev/null || true
 cp /serikaos/built-in-media/logo/serikaos-logo.png "$AIROOTFS/usr/share/serikaos/logo.png" 2>/dev/null || true
 
-# Boot logo asset (used by Plymouth customization in chroot)
-if command -v magick &>/dev/null; then
+# Boot logo asset (used by Plymouth and SDDM)
+LOGO_TEXT="/serikaos/built-in-media/logo/SerikaOS-LogoText.png"
+mkdir -p "$AIROOTFS/usr/share/serikaos"
+mkdir -p "$AIROOTFS/usr/share/plymouth/themes/serika"
+
+if [[ -f "$LOGO_TEXT" ]]; then
+    # Plymouth logo (needs to be smaller)
+    magick "$LOGO_TEXT" -resize 450x "$AIROOTFS/usr/share/plymouth/themes/serika/watermark.png" 2>/dev/null || true
+    # Global boot logo for firstboot backup
+    cp "$LOGO_TEXT" "$AIROOTFS/usr/share/serikaos/boot-logo.png"
+elif command -v magick &>/dev/null; then
     magick -size 900x220 xc:none \
         -font DejaVu-Sans-Bold -pointsize 120 -fill white -gravity center -annotate -130+0 "Serika" \
         -font DejaVu-Sans-Bold -pointsize 120 -fill "#e8a0bf" -gravity center -annotate +260+0 "OS" \
-        "$AIROOTFS/usr/share/serikaos/boot-logo.png" 2>/dev/null || true
+        -resize 450x "$AIROOTFS/usr/share/plymouth/themes/serika/watermark.png" 2>/dev/null || true
 fi
+
+# Define custom Plymouth theme (prevents conflicts with spinner)
+cat > "$AIROOTFS/usr/share/plymouth/themes/serika/serika.plymouth" << 'EOF'
+[Plymouth Theme]
+Name=SerikaOS
+Description=SerikaOS spinner theme
+ModuleName=two-step
+
+[two-step]
+ImageDir=/usr/share/plymouth/themes/serika
+HorizontalAlignment=0.5
+VerticalAlignment=0.5
+Transition=fade
+TransitionDuration=0.5
+
+[spinner]
+Watermark=watermark.png
+EOF
+
+# NOTE: Plymouth/pixmap overrides happen INSIDE customize_airootfs.sh (after pacman)
+# to avoid conflicting with the filesystem and plymouth packages.
 
 # --- 9.5. SYSLINUX branding overlay ---
 echo "[*] Installing BIOS boot branding..."
@@ -272,7 +346,7 @@ ENDTEXT
 MENU LABEL Try SerikaOS live medium (x86_64, BIOS)
 LINUX /arch/boot/x86_64/vmlinuz-linux
 INITRD /arch/boot/x86_64/initramfs-linux.img
-APPEND archisobasedir=arch archisolabel=${ISO_LABEL:-SERIKAOS} quiet splash loglevel=3 rd.udev.log_priority=3 vt.global_cursor_default=0
+APPEND archisobasedir=arch archisolabel=${ISO_LABEL:-SERIKAOS} quiet splash plymouth.theme=serika loglevel=3 rd.udev.log_priority=3 vt.global_cursor_default=0
 
 LABEL serika-install
 TEXT HELP
@@ -282,7 +356,7 @@ ENDTEXT
 MENU LABEL Install SerikaOS (x86_64, BIOS)
 LINUX /arch/boot/x86_64/vmlinuz-linux
 INITRD /arch/boot/x86_64/initramfs-linux.img
-APPEND archisobasedir=arch archisolabel=${ISO_LABEL:-SERIKAOS} systemd.unit=graphical.target quiet splash loglevel=3 rd.udev.log_priority=3 vt.global_cursor_default=0
+APPEND archisobasedir=arch archisolabel=${ISO_LABEL:-SERIKAOS} systemd.unit=graphical.target quiet splash plymouth.theme=serika loglevel=3 rd.udev.log_priority=3 vt.global_cursor_default=0
 
 LABEL serika-safe
 TEXT HELP
@@ -291,7 +365,7 @@ ENDTEXT
 MENU LABEL SerikaOS safe graphics mode
 LINUX /arch/boot/x86_64/vmlinuz-linux
 INITRD /arch/boot/x86_64/initramfs-linux.img
-APPEND archisobasedir=arch archisolabel=${ISO_LABEL:-SERIKAOS} nomodeset quiet splash loglevel=3 rd.udev.log_priority=3 vt.global_cursor_default=0
+APPEND archisobasedir=arch archisolabel=${ISO_LABEL:-SERIKAOS} nomodeset quiet splash plymouth.theme=serika loglevel=3 rd.udev.log_priority=3 vt.global_cursor_default=0
 EOF
 
 cat > "$PROFILE_DIR/syslinux/archiso_tail.cfg" << EOF
@@ -345,120 +419,268 @@ if command -v magick &>/dev/null; then
     fi
 fi
 
-# --- 11. SDDM config ---
+
+
+# ============================================================
+# STATIC AIROOTFS CUSTOMIZATIONS
+# Modern archiso no longer runs customize_airootfs.sh.
+# All customization must be done via static files in airootfs
+# plus a first-boot systemd service for runtime operations.
+# ============================================================
+
+echo "[*] Writing static airootfs configuration..."
+
+# --- graphical.target as default (THIS IS THE KEY TO AVOIDING BLACK SCREEN) ---
+mkdir -p "$AIROOTFS/etc/systemd/system"
+ln -sf /usr/lib/systemd/system/graphical.target "$AIROOTFS/etc/systemd/system/default.target"
+
+# --- SDDM autologin config (static, using plasma.desktop for Plasma 6 Wayland) ---
 mkdir -p "$AIROOTFS/etc/sddm.conf.d"
-cat > "$AIROOTFS/etc/sddm.conf.d/serikaos.conf" << 'EOF'
+cat > "$AIROOTFS/etc/sddm.conf.d/autologin.conf" << 'SDDMCFGEOF'
+[Autologin]
+User=liveuser
+Session=plasma
+Relogin=false
+
 [Theme]
 Current=SerikaOS
 
-[Autologin]
-User=liveuser
-Session=plasma.desktop
-Relogin=false
-
 [Users]
-HideUsers=sddm,nobody,daemon,bin,sys,mail,ftp,http,dbus,polkitd,avahi,colord,git,rtkit,uuidd,ntp,systemd-journal-remote,systemd-network,systemd-oom,systemd-resolve,systemd-timesync,tss
-HideShells=/usr/bin/nologin,/sbin/nologin,/bin/false
 MinimumUid=1000
 MaximumUid=65000
 RememberLastUser=false
 RememberLastSession=false
-EOF
 
-# Deterministic live-user setup at build time (inside chroot)
-mkdir -p "$AIROOTFS/root"
-cat > "$AIROOTFS/root/customize_airootfs.sh" << 'EOF'
-#!/usr/bin/env bash
-set -euo pipefail
+[General]
+InputMethod=
+HaltCommand=/usr/bin/systemctl poweroff
+RebootCommand=/usr/bin/systemctl reboot
+SDDMCFGEOF
 
-groupadd -f autologin
-id -u liveuser >/dev/null 2>&1 || useradd -m -u 1000 -G wheel,audio,video,optical,storage,network -s /bin/bash -c "SerikaOS Live User" liveuser
-usermod -aG autologin liveuser
+# --- PAM: SDDM autologin ---
+mkdir -p "$STAGING/etc/pam.d"
+cat > "$STAGING/etc/pam.d/sddm-autologin" << 'PAMEOF'
+#%PAM-1.0
+auth     required pam_env.so
+auth     required pam_permit.so
+account  required pam_permit.so
+password required pam_deny.so
+session  required pam_limits.so
+session  optional pam_keyinit.so force revoke
+session  required pam_env.so
+session  required pam_permit.so
+PAMEOF
 
-passwd -d liveuser || true
-passwd -d root || true
+cat > "$STAGING/etc/pam.d/sddm" << 'PAMEOF2'
+#%PAM-1.0
+auth       sufficient   pam_unix.so nullok try_first_pass
+auth       required     pam_deny.so
+account    required     pam_permit.so
+password   required     pam_deny.so
+session    required     pam_limits.so
+session    optional     pam_keyinit.so force revoke
+session    required     pam_env.so
+session    required     pam_unix.so
+PAMEOF2
 
-printf "%s\n" "#%PAM-1.0" "auth     required pam_env.so" "auth     required pam_permit.so" "account  required pam_permit.so" "password required pam_deny.so" "session  required pam_limits.so" "session  optional pam_keyinit.so force revoke" "session  required pam_env.so" "session  required pam_permit.so" > /etc/pam.d/sddm-autologin
-printf "%s\n" "#%PAM-1.0" "auth       sufficient   pam_unix.so nullok try_first_pass" "auth       required     pam_deny.so" "account    required     pam_permit.so" "password   required     pam_deny.so" "session    required     pam_limits.so" "session    optional     pam_keyinit.so force revoke" "session    required     pam_env.so" "session    required     pam_unix.so" > /etc/pam.d/sddm
+# --- Sudoers ---
+mkdir -p "$AIROOTFS/etc/sudoers.d"
+cat > "$AIROOTFS/etc/sudoers.d/00-live" << 'SUDOEOF'
+root ALL=(ALL:ALL) NOPASSWD: ALL
+liveuser ALL=(ALL:ALL) NOPASSWD: ALL
+SUDOEOF
 
-mkdir -p /etc/sudoers.d
-echo "root ALL=(ALL:ALL) NOPASSWD: ALL" > /etc/sudoers.d/00-live
-echo "liveuser ALL=(ALL:ALL) NOPASSWD: ALL" >> /etc/sudoers.d/00-live
-chmod 440 /etc/sudoers.d/00-live
+# --- Polkit: allow liveuser to do everything ---
+mkdir -p "$AIROOTFS/etc/polkit-1/rules.d"
+cat > "$AIROOTFS/etc/polkit-1/rules.d/49-nopasswd-calamares.rules" << 'POLKITEOF'
+polkit.addRule(function(action, subject) {
+    if (subject.user == "liveuser") {
+        return polkit.Result.YES;
+    }
+});
+POLKITEOF
 
-mkdir -p /home/liveuser/Desktop
-cp -a /etc/skel/. /home/liveuser/ 2>/dev/null || true
-chown -R liveuser:liveuser /home/liveuser
+# --- OS branding ---
+cat > "$STAGING/etc/os-release" << 'OSREOF'
+NAME="SerikaOS"
+PRETTY_NAME="SerikaOS"
+ID=serikaos
+ID_LIKE=arch
+BUILD_ID=rolling
+ANSI_COLOR="38;2;232;160;191"
+HOME_URL="https://github.com/serikaos"
+DOCUMENTATION_URL="https://wiki.archlinux.org"
+SUPPORT_URL="https://github.com/serikaos/issues"
+BUG_REPORT_URL="https://github.com/serikaos/issues"
+PRIVACY_POLICY_URL="https://github.com/serikaos"
+LOGO=serikaos
+OSREOF
 
-cat > /home/liveuser/.bash_profile << 'BASHEOF'
-if [[ -z "${DISPLAY:-}" && "$(tty)" == "/dev/tty1" ]]; then
-    exec startx
-fi
-BASHEOF
+cat > "$STAGING/etc/lsb-release" << 'LSBREOF'
+DISTRIB_ID=SerikaOS
+DISTRIB_RELEASE=rolling
+DISTRIB_DESCRIPTION="SerikaOS Rolling platform"
+DISTRIB_CODENAME=serika
+LSBREOF
 
-cat > /home/liveuser/.xinitrc << 'XINITEOF'
-#!/bin/sh
-export QT_QPA_PLATFORM=xcb
-export QT_AUTO_SCREEN_SCALE_FACTOR=0
-export QT_ENABLE_HIGHDPI_SCALING=0
-export QT_SCALE_FACTOR=1
-export GDK_SCALE=1
-export GDK_DPI_SCALE=1
+# --- Environment variables ---
+cat > "$STAGING/etc/environment" << 'ENVEOF'
+QT_AUTO_SCREEN_SCALE_FACTOR=0
+QT_ENABLE_HIGHDPI_SCALING=0
+QT_SCALE_FACTOR=1
+GDK_SCALE=1
+GDK_DPI_SCALE=1
+KWIN_X11_NO_SYNC_TO_VBLANK=1
+KWIN_LOWLATENCY=1
+KWIN_EFFECTS_FOR_LOW_PERFORMANCE=1
+ENVEOF
 
-# Improve virtual machine compatibility/performance (QEMU/VirtualBox/VMware)
-if [[ -r /sys/class/dmi/id/product_name ]] && grep -Eiq 'kvm|qemu|virtualbox|vmware' /sys/class/dmi/id/product_name; then
-    export LIBGL_ALWAYS_SOFTWARE=1
-    export QT_QUICK_BACKEND=software
-    export KWIN_COMPOSE=N
-fi
-
-exec dbus-run-session startplasma-x11
-XINITEOF
-
-chmod +x /home/liveuser/.xinitrc
-chown liveuser:liveuser /home/liveuser/.bash_profile /home/liveuser/.xinitrc
-
-cat > /etc/profile.d/serikaos-scale.sh << 'SCALEEOF'
+mkdir -p "$AIROOTFS/etc/profile.d"
+cat > "$AIROOTFS/etc/profile.d/serikaos-scale.sh" << 'SCALEEOF'
 export QT_AUTO_SCREEN_SCALE_FACTOR=0
 export QT_ENABLE_HIGHDPI_SCALING=0
 export QT_SCALE_FACTOR=1
 export GDK_SCALE=1
 export GDK_DPI_SCALE=1
 SCALEEOF
-chmod 755 /etc/profile.d/serikaos-scale.sh
 
-cat > /etc/environment << 'ENVEOF'
-QT_AUTO_SCREEN_SCALE_FACTOR=0
-QT_ENABLE_HIGHDPI_SCALING=0
-QT_SCALE_FACTOR=1
-GDK_SCALE=1
-GDK_DPI_SCALE=1
-ENVEOF
-
-if command -v plymouth-set-default-theme >/dev/null 2>&1; then
-    plymouth-set-default-theme spinner >/dev/null 2>&1 || true
-fi
-
-mkdir -p /etc/plymouth /usr/share/plymouth/themes/spinner
-cat > /etc/plymouth/plymouthd.conf << 'PLYEOF'
+# --- Plymouth config (moved back to AIROOTFS to ensure it's in initramfs) ---
+mkdir -p "$AIROOTFS/etc/plymouth"
+cat > "$AIROOTFS/etc/plymouth/plymouthd.conf" << 'PLYEOF'
 [Daemon]
-Theme=spinner
+Theme=serika
 ShowDelay=0
 DeviceTimeout=8
 PLYEOF
 
-if [[ -f /usr/share/serikaos/boot-logo.png ]]; then
-    cp /usr/share/serikaos/boot-logo.png /usr/share/plymouth/themes/spinner/watermark.png
-elif [[ -f /usr/share/serikaos/logo.png ]]; then
-    cp /usr/share/serikaos/logo.png /usr/share/plymouth/themes/spinner/watermark.png
+# --- liveuser via sysusers.d (avoids passwd conflicts) ---
+mkdir -p "$AIROOTFS/etc/sysusers.d"
+cat > "$AIROOTFS/etc/sysusers.d/liveuser.conf" << 'SYSUSEREOF'
+u liveuser 1000 "SerikaOS Live User" /home/liveuser /bin/bash
+m liveuser wheel
+m liveuser audio
+m liveuser video
+m liveuser optical
+m liveuser storage
+m liveuser network
+m liveuser autologin
+SYSUSEREOF
+
+# Keep staging shadow/gshadow for initial permission setup
+mkdir -p "$STAGING/etc"
+cat > "$STAGING/etc/shadow" << 'SHEOF'
+root::14871::::::
+liveuser::14871:0:99999:7:::
+SHEOF
+
+cat > "$STAGING/etc/gshadow" << 'GSHEOF'
+root:::
+wheel:::liveuser
+audio:::liveuser
+video:::liveuser
+optical:::liveuser
+storage:::liveuser
+network:::liveuser
+autologin:::liveuser
+liveuser:!::
+GSHEOF
+
+# --- Desktop shortcut in skel ---
+mkdir -p "$AIROOTFS/etc/skel/Desktop"
+cat > "$AIROOTFS/etc/skel/Desktop/install-serikaos.desktop" << 'DESKEOF'
+[Desktop Entry]
+Type=Application
+Name=Install SerikaOS
+Comment=Launch the SerikaOS installer
+Exec=/usr/local/bin/serikaos-installer
+Icon=system-software-install
+Terminal=false
+Categories=System;
+StartupNotify=true
+SingleMainWindow=true
+DESKEOF
+
+# --- First-boot service (runtime-only operations) ---
+mkdir -p "$AIROOTFS/usr/local/bin"
+cat > "$AIROOTFS/usr/local/bin/serikaos-firstboot" << 'FBEOF'
+#!/bin/bash
+set -e
+
+# Ensure liveuser home exists with skel content
+if [[ ! -d /home/liveuser ]]; then
+    mkdir -p /home/liveuser
 fi
-EOF
-chmod +x "$AIROOTFS/root/customize_airootfs.sh"
+cp -a /etc/skel/. /home/liveuser/ 2>/dev/null || true
+mkdir -p /home/liveuser/Desktop
+cp /usr/share/applications/serikaos-installer.desktop /home/liveuser/Desktop/ 2>/dev/null || true
+cp /etc/skel/Desktop/install-serikaos.desktop /home/liveuser/Desktop/ 2>/dev/null || true
+chmod +x /home/liveuser/Desktop/*.desktop 2>/dev/null || true
+chown -R 1000:1000 /home/liveuser
 
-# Live mode boots via tty autologin + startx; do not force a display manager symlink.
-rm -f "$AIROOTFS/etc/systemd/system/display-manager.service" 2>/dev/null || true
+# Trust desktop files for KDE
+mkdir -p /home/liveuser/.local/share
+cat > /home/liveuser/.local/share/trusted-desktop-files << 'TRUSTEOF'
+/home/liveuser/Desktop/install-serikaos.desktop
+/home/liveuser/Desktop/serikaos-installer.desktop
+TRUSTEOF
+chown -R 1000:1000 /home/liveuser/.local
 
-# TTY1 autologin for liveuser (this is the primary live login path)
+# Overwrite branding (backup/fallback branding)
+if [[ -f /usr/share/serikaos/boot-logo.png ]]; then
+    cp /usr/share/serikaos/boot-logo.png /usr/share/pixmaps/archlinux-logo.png 2>/dev/null || true
+    cp /usr/share/serikaos/boot-logo.png /usr/share/pixmaps/archlinux-logo-text.png 2>/dev/null || true
+elif [[ -f /usr/share/serikaos/logo.png ]]; then
+    cp /usr/share/serikaos/logo.png /usr/share/pixmaps/archlinux-logo.png 2>/dev/null || true
+fi
+
+# Apply staged customizations
+if [[ -d /opt/serikaos-custom ]]; then
+    cp -a /opt/serikaos-custom/* /
+    rm -rf /opt/serikaos-custom
+fi
+
+chmod +x /usr/local/bin/serikaos-installer /usr/local/bin/serikaos-welcome 2>/dev/null || true
+FBEOF
+chmod +x "$AIROOTFS/usr/local/bin/serikaos-firstboot"
+
+mkdir -p "$AIROOTFS/etc/systemd/system"
+cat > "$AIROOTFS/etc/systemd/system/serikaos-firstboot.service" << 'SVCEOF'
+[Unit]
+Description=SerikaOS First Boot Setup
+After=local-fs.target
+Before=sddm.service display-manager.service
+ConditionPathExists=!/var/lib/serikaos-firstboot-done
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/serikaos-firstboot
+ExecStartPost=/usr/bin/touch /var/lib/serikaos-firstboot-done
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
+SVCEOF
+
+# Enable firstboot service
+mkdir -p "$AIROOTFS/etc/systemd/system/multi-user.target.wants"
+ln -sf /etc/systemd/system/serikaos-firstboot.service "$AIROOTFS/etc/systemd/system/multi-user.target.wants/serikaos-firstboot.service"
+
+# --- Root bashrc ---
+mkdir -p "$AIROOTFS/root"
+cat >> "$AIROOTFS/root/.bashrc" << 'BASHEOF'
+# SerikaOS live session
+[[ -z "$SERIKAOS_WELCOMED" ]] && export SERIKAOS_WELCOMED=1 && fastfetch 2>/dev/null
+BASHEOF
+
+# Enable SDDM via symlink (belt and suspenders)
+mkdir -p "$AIROOTFS/etc/systemd/system"
+ln -sf /usr/lib/systemd/system/sddm.service "$AIROOTFS/etc/systemd/system/display-manager.service" 2>/dev/null || true
+
+# Enable NetworkManager
+mkdir -p "$AIROOTFS/etc/systemd/system/multi-user.target.wants"
+ln -sf /usr/lib/systemd/system/NetworkManager.service "$AIROOTFS/etc/systemd/system/multi-user.target.wants/NetworkManager.service" 2>/dev/null || true
+
+# TTY1 autologin as fallback
 mkdir -p "$AIROOTFS/etc/systemd/system/getty@tty1.service.d"
 cat > "$AIROOTFS/etc/systemd/system/getty@tty1.service.d/autologin.conf" << 'EOF'
 [Service]
@@ -483,7 +705,7 @@ Name=Install SerikaOS
 Comment=Launch the SerikaOS installer
 Exec=/usr/local/bin/serikaos-installer
 Icon=system-software-install
-Terminal=true
+Terminal=false
 Categories=System;
 StartupNotify=true
 SingleMainWindow=true
@@ -526,6 +748,10 @@ EOF
 # --- 12. Custom GRUB config for ISO ---
 echo "[*] Configuring ISO boot menu..."
 cat > "$PROFILE_DIR/grub/grub.cfg" << GRUBCFG
+insmod part_gpt
+insmod part_msdos
+insmod fat
+insmod iso9660
 insmod all_video
 insmod gfxterm
 insmod gfxmenu
@@ -536,30 +762,38 @@ set gfxmode=auto
 set gfxpayload=keep
 terminal_output gfxterm
 
-set theme=(\${root})/boot/grub/themes/SerikaOS/theme.txt
+# Load fonts from the GRUB prefix (which is /boot/grub on the ISO)
+loadfont "\${prefix}/fonts/dejavu_11.pf2"
+loadfont "\${prefix}/fonts/dejavu_12.pf2"
+loadfont "\${prefix}/fonts/dejavu_14.pf2"
+loadfont "\${prefix}/fonts/dejavu_16.pf2"
+loadfont "\${prefix}/fonts/dejavu_24.pf2"
+loadfont "\${prefix}/fonts/dejavu_bold_16.pf2"
+loadfont "\${prefix}/fonts/dejavu_bold_24.pf2"
 
-set default=0
+set theme="\${prefix}/themes/SerikaOS/theme.txt"
 set timeout=3
+set default=1
 
 menuentry '  Try SerikaOS — Live Session' --class serikaos --class linux {
     set gfxpayload=keep
-    linux (\${root})/arch/boot/x86_64/vmlinuz-linux archisobasedir=arch archisolabel=${ISO_LABEL:-SERIKAOS} cow_spacesize=2G quiet splash loglevel=3 rd.udev.log_priority=3 vt.global_cursor_default=0
+    linux (\${root})/arch/boot/x86_64/vmlinuz-linux archisobasedir=arch archisolabel=${ISO_LABEL:-SERIKAOS} cow_spacesize=2G quiet splash plymouth.theme=serika loglevel=3 rd.udev.log_priority=3 vt.global_cursor_default=0
     initrd (\${root})/arch/boot/x86_64/initramfs-linux.img
 }
 
 menuentry '  Install SerikaOS' --class serikaos --class linux {
     set gfxpayload=keep
-    linux (\${root})/arch/boot/x86_64/vmlinuz-linux archisobasedir=arch archisolabel=${ISO_LABEL:-SERIKAOS} cow_spacesize=2G systemd.unit=graphical.target quiet splash loglevel=3 rd.udev.log_priority=3 vt.global_cursor_default=0
+    linux (\${root})/arch/boot/x86_64/vmlinuz-linux archisobasedir=arch archisolabel=${ISO_LABEL:-SERIKAOS} cow_spacesize=2G systemd.unit=graphical.target quiet splash plymouth.theme=serika loglevel=3 rd.udev.log_priority=3 vt.global_cursor_default=0
     initrd (\${root})/arch/boot/x86_64/initramfs-linux.img
 }
 
 submenu '  Advanced Options >' --class submenu {
     menuentry '  SerikaOS (Safe Graphics)' --class serikaos {
-        linux (\${root})/arch/boot/x86_64/vmlinuz-linux archisobasedir=arch archisolabel=${ISO_LABEL:-SERIKAOS} nomodeset cow_spacesize=2G quiet splash loglevel=3 rd.udev.log_priority=3 vt.global_cursor_default=0
+        linux (\${root})/arch/boot/x86_64/vmlinuz-linux archisobasedir=arch archisolabel=${ISO_LABEL:-SERIKAOS} nomodeset cow_spacesize=2G quiet splash plymouth.theme=serika loglevel=3 rd.udev.log_priority=3 vt.global_cursor_default=0
         initrd (\${root})/arch/boot/x86_64/initramfs-linux.img
     }
     menuentry '  SerikaOS (Copy to RAM)' --class serikaos {
-        linux (\${root})/arch/boot/x86_64/vmlinuz-linux archisobasedir=arch archisolabel=${ISO_LABEL:-SERIKAOS} copytoram cow_spacesize=2G quiet splash loglevel=3 rd.udev.log_priority=3 vt.global_cursor_default=0
+        linux (\${root})/arch/boot/x86_64/vmlinuz-linux archisobasedir=arch archisolabel=${ISO_LABEL:-SERIKAOS} copytoram cow_spacesize=2G quiet splash plymouth.theme=serika loglevel=3 rd.udev.log_priority=3 vt.global_cursor_default=0
         initrd (\${root})/arch/boot/x86_64/initramfs-linux.img
     }
     menuentry '  Boot from local disk' --class hd {
@@ -577,7 +811,7 @@ echo "════════════════════════�
 echo "  Building ISO with mkarchiso..."
 echo "════════════════════════════════════════════════════════"
 echo ""
-mkarchiso -v -w /tmp/archiso-work -o /out "$PROFILE_DIR"
+mkarchiso -v -w "${SERIKA_WORK_DIR:-/tmp/archiso-work}" -o "${SERIKA_OUT_DIR:-/out}" "$PROFILE_DIR"
 
 echo ""
 echo "════════════════════════════════════════════════════════"

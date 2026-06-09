@@ -28,5 +28,9 @@ airootfs_image_tool_options=('-comp' 'zstd' '-Xcompression-level' '3' '-b' '1M')
 # File permissions
 file_permissions=(
     ["/etc/shadow"]="0:0:400"
+    ["/etc/gshadow"]="0:0:400"
+    ["/etc/sudoers.d/00-live"]="0:0:440"
+    ["/usr/local/bin/serikaos-installer"]="0:0:755"
+    ["/usr/local/bin/serikaos-welcome"]="0:0:755"
     ["/root"]="0:0:750"
 )
