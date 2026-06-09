@@ -17,6 +17,9 @@ on:
       - 'LICENSE'
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     name: Build ISO
@@ -24,6 +27,8 @@ jobs:
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Cache AUR Packages
         uses: actions/cache@v4
@@ -44,3 +49,28 @@ jobs:
           path: out/serikaos-*.iso
           if-no-files-found: error
           retention-days: 7
+
+      - name: Delete old tag and release
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release delete "nightly" --cleanup-tag -y || true
+          git tag -d "nightly" || true
+
+      - name: Create or Update Nightly Release
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: nightly
+          name: "SerikaOS Nightly Build"
+          body: |
+            This is an automated nightly build of SerikaOS.
+            
+            **Commit**: `${{ github.sha }}`
+            **Built on**: `${{ github.event.head_commit.timestamp || 'Manual Dispatch' }}`
+          prerelease: true
+          files: |
+            out/serikaos-*.iso
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
