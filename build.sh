@@ -329,16 +329,6 @@ mkdir -p /home/liveuser/Desktop
 cp -a /etc/skel/. /home/liveuser/ 2>/dev/null || true
 chown -R liveuser:liveuser /home/liveuser
 
-# Polkit rule to allow liveuser to run Calamares without password
-mkdir -p /etc/polkit-1/rules.d
-cat > /etc/polkit-1/rules.d/49-nopasswd-calamares.rules << 'POLKITEOF'
-polkit.addRule(function(action, subject) {
-    if (subject.user == "liveuser") {
-        return polkit.Result.YES;
-    }
-});
-POLKITEOF
-
 cat > /home/liveuser/.bash_profile << 'BASHEOF'
 if [[ -z "${DISPLAY:-}" && "$(tty)" == "/dev/tty1" ]]; then
     exec startx
@@ -354,14 +344,11 @@ export QT_SCALE_FACTOR=1
 export GDK_SCALE=1
 export GDK_DPI_SCALE=1
 
-# VM detection — use lighter settings but keep GPU acceleration
-if [ -r /sys/class/dmi/id/product_name ] && grep -Eiq 'kvm|qemu|virtualbox|vmware' /sys/class/dmi/id/product_name 2>/dev/null; then
-    export KWIN_LOWLATENCY=1
-    # Write a lighter kwin config for VMs
-    mkdir -p "$HOME/.config"
-    kwriteconfig5 --file kwinrc --group Compositing --key Backend XRender 2>/dev/null || true
-    kwriteconfig5 --file kwinrc --group Compositing --key Enabled true 2>/dev/null || true
-    kwriteconfig5 --file kwinrc --group "Effect-Blur" --key Enabled false 2>/dev/null || true
+# Improve virtual machine compatibility/performance (QEMU/VirtualBox/VMware)
+if [[ -r /sys/class/dmi/id/product_name ]] && grep -Eiq 'kvm|qemu|virtualbox|vmware' /sys/class/dmi/id/product_name; then
+    export LIBGL_ALWAYS_SOFTWARE=1
+    export QT_QUICK_BACKEND=software
+    export KWIN_COMPOSE=N
 fi
 
 exec dbus-run-session startplasma-x11

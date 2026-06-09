@@ -4,46 +4,148 @@
 # Single entrypoint for the live session installer
 # ============================================================
 
+set -u
+
+PINK='\033[38;2;232;160;191m'
+TEAL='\033[38;2;92;198;208m'
+GOLD='\033[38;2;212;168;83m'
+DIM='\033[38;2;106;106;138m'
+RESET='\033[0m'
+BOLD='\033[1m'
+
+LOCK_ROOT="${XDG_RUNTIME_DIR:-/run/user/${UID}}"
+if [[ ! -d "${LOCK_ROOT}" ]] || [[ ! -w "${LOCK_ROOT}" ]]; then
+    LOCK_ROOT="/tmp"
+fi
+LOCK_FILE="${LOCK_ROOT}/serikaos-installer.lock"
 CALAMARES_BIN="/usr/bin/calamares"
+CALAMARES_PID=""
+
+print_header() {
+    echo ""
+    echo -e "${PINK}${BOLD}  SerikaOS Installer${RESET}"
+    echo -e "${DIM}  ─────────────────${RESET}"
+    echo ""
+}
 
 notify_user() {
     local message="$1"
     if command -v notify-send &>/dev/null && { [[ -n "${DISPLAY:-}" ]] || [[ -n "${WAYLAND_DISPLAY:-}" ]]; }; then
-        notify-send -i system-software-install "SerikaOS Installer" "$message" 2>/dev/null || true
+        notify-send "SerikaOS Installer" "$message" 2>/dev/null || true
     fi
 }
 
-# Check if already running
-if pgrep -x calamares &>/dev/null; then
-    notify_user "The installer is already running."
-    exit 0
-fi
+focus_existing_window() {
+    if command -v wmctrl &>/dev/null; then
+        wmctrl -xa calamares.Calamares 2>/dev/null && return 0
+        wmctrl -a "Install SerikaOS" 2>/dev/null && return 0
+    fi
+    return 1
+}
 
-# Must have a display
-if [[ -z "${DISPLAY:-}" ]] && [[ -z "${WAYLAND_DISPLAY:-}" ]]; then
-    echo "No display server detected. Please start the desktop environment first."
+fullscreen_window() {
+    if ! command -v wmctrl &>/dev/null; then
+        return 0
+    fi
+
+    local attempts
+    for attempts in $(seq 1 40); do
+        wmctrl -x -r calamares.Calamares -b add,fullscreen 2>/dev/null && return 0
+        wmctrl -r "Install SerikaOS" -b add,fullscreen 2>/dev/null && return 0
+        sleep 0.25
+    done
+
+    return 1
+}
+
+start_graphical_session() {
+    echo -e "${GOLD}  No display server detected.${RESET}"
+    echo -e "${DIM}  Starting a temporary X session for installer...${RESET}"
+    echo ""
+
+    if command -v startx &>/dev/null; then
+        exec startx /usr/local/bin/serikaos-installer -- :0
+    fi
+
+    echo -e "${GOLD}  X session launcher not found.${RESET}"
+    echo -e "${DIM}  You can install SerikaOS from the command line:${RESET}"
+    echo ""
+    echo -e "    ${TEAL}1.${RESET} Partition your disk with ${BOLD}cfdisk /dev/sda${RESET}"
+    echo -e "    ${TEAL}2.${RESET} Format: ${BOLD}mkfs.btrfs /dev/sda2${RESET}"
+    echo -e "    ${TEAL}3.${RESET} Mount: ${BOLD}mount /dev/sda2 /mnt${RESET}"
+    echo -e "    ${TEAL}4.${RESET} Install: ${BOLD}pacstrap /mnt base linux linux-firmware${RESET}"
+    echo -e "    ${TEAL}5.${RESET} Configure: ${BOLD}arch-chroot /mnt${RESET}"
+    echo ""
     exit 1
-fi
+}
 
-# Check if calamares binary exists
-if [[ ! -x "${CALAMARES_BIN}" ]]; then
-    # Try archinstall as fallback
-    if command -v archinstall &>/dev/null; then
-        notify_user "Graphical installer not available. Launching archinstall..."
-        if command -v konsole &>/dev/null; then
-            exec konsole --hide-menubar --hide-tabbar -e archinstall
+launch_calamares() {
+    local preserve_list="DISPLAY,WAYLAND_DISPLAY,XAUTHORITY,DBUS_SESSION_BUS_ADDRESS,XDG_CURRENT_DESKTOP,XDG_SESSION_TYPE,QT_AUTO_SCREEN_SCALE_FACTOR,QT_ENABLE_HIGHDPI_SCALING,QT_SCALE_FACTOR,QT_QPA_PLATFORMTHEME,GDK_SCALE,GDK_DPI_SCALE"
+    local runner=(/usr/bin/env QT_QPA_PLATFORMTHEME="${QT_QPA_PLATFORMTHEME:-qt5ct}" QT_AUTO_SCREEN_SCALE_FACTOR=0 QT_ENABLE_HIGHDPI_SCALING=0 QT_SCALE_FACTOR=1 GDK_SCALE=1 GDK_DPI_SCALE=1 "${CALAMARES_BIN}")
+
+    if [[ "${EUID}" -ne 0 ]]; then
+        if command -v pkexec &>/dev/null; then
+            runner=(pkexec env DISPLAY="${DISPLAY:-}" XAUTHORITY="${XAUTHORITY:-}" DBUS_SESSION_BUS_ADDRESS="${DBUS_SESSION_BUS_ADDRESS:-}" QT_QPA_PLATFORMTHEME="${QT_QPA_PLATFORMTHEME:-qt5ct}" QT_AUTO_SCREEN_SCALE_FACTOR=0 QT_ENABLE_HIGHDPI_SCALING=0 QT_SCALE_FACTOR=1 GDK_SCALE=1 GDK_DPI_SCALE=1 "${CALAMARES_BIN}")
         else
-            exec archinstall
+            runner=(sudo --preserve-env="${preserve_list}" /usr/bin/env QT_QPA_PLATFORMTHEME="${QT_QPA_PLATFORMTHEME:-qt5ct}" QT_AUTO_SCREEN_SCALE_FACTOR=0 QT_ENABLE_HIGHDPI_SCALING=0 QT_SCALE_FACTOR=1 GDK_SCALE=1 GDK_DPI_SCALE=1 "${CALAMARES_BIN}")
         fi
     fi
 
-    notify_user "No installer found. Please ensure calamares is installed."
-    echo "No installer was found on this live image."
+    echo -e "${TEAL}  Launching Calamares installer...${RESET}"
+    echo -e "${DIM}  Opening a full-screen premium install flow.${RESET}"
+    echo ""
+
+    "${runner[@]}" &
+    CALAMARES_PID=$!
+
+    fullscreen_window || true
+    wait "${CALAMARES_PID}"
+}
+
+launch_archinstall_fallback() {
+    echo -e "${GOLD}  Graphical installer is unavailable in this build.${RESET}"
+    echo -e "${DIM}  Launching guided terminal installer (archinstall)...${RESET}"
+    echo ""
+
+    if command -v konsole &>/dev/null; then
+        exec konsole --fullscreen --hide-menubar --hide-tabbar -e archinstall
+    elif command -v xterm &>/dev/null; then
+        exec xterm -fa "Monospace" -fs 12 -e archinstall
+    else
+        exec archinstall
+    fi
+}
+
+print_header
+
+if [[ -z "${DISPLAY:-}" ]] && [[ -z "${WAYLAND_DISPLAY:-}" ]]; then
+    start_graphical_session
+fi
+
+if [[ ! -x "${CALAMARES_BIN}" ]]; then
+    if command -v archinstall &>/dev/null; then
+        launch_archinstall_fallback
+    fi
+
+    echo -e "${GOLD}  No installer was found on this live image.${RESET}"
+    echo -e "${DIM}  Install manually with arch tools or rebuild with installer support.${RESET}"
     exit 1
 fi
 
-notify_user "Starting the SerikaOS installer..."
+mkdir -p "${LOCK_ROOT}"
+exec 9>"${LOCK_FILE}"
+if ! flock -n 9; then
+    focus_existing_window || true
+    notify_user "The installer is already open."
+    echo -e "${DIM}  The installer is already running.${RESET}"
+    exit 0
+fi
 
-# Launch Calamares with sudo (liveuser has NOPASSWD sudo)
-# Pass display environment so the GUI can render
-exec sudo -E "${CALAMARES_BIN}"
+if pgrep -x calamares &>/dev/null; then
+    focus_existing_window || true
+    notify_user "The installer is already open."
+    echo -e "${DIM}  The installer is already running.${RESET}"
+    exit 0
+fi
+
+launch_calamares

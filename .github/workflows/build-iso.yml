@@ -1,0 +1,46 @@
+name: Build SerikaOS ISO
+
+on:
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - '**.md'
+      - '.gitignore'
+      - 'LICENSE'
+  pull_request:
+    branches:
+      - main
+    paths-ignore:
+      - '**.md'
+      - '.gitignore'
+      - 'LICENSE'
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build ISO
+    runs-on: blacksmith
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Cache AUR Packages
+        uses: actions/cache@v4
+        with:
+          path: out/packages
+          key: ${{ runner.os }}-aur-packages-${{ hashFiles('archiso-profile/packages.x86_64', 'archiso-profile/packages-live.x86_64') }}
+          restore-keys: |
+            ${{ runner.os }}-aur-packages-
+
+      - name: Build ISO inside Docker
+        run: |
+          sudo bash build-docker-iso.sh
+
+      - name: Upload ISO Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: serikaos-iso
+          path: out/serikaos-*.iso
+          if-no-files-found: error
+          retention-days: 7

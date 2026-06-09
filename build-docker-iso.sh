@@ -57,7 +57,6 @@ docker run --rm --privileged \
     -v "${OUT_DIR}:/out" \
     -e ISO_VERSION="${ISO_VERSION}" \
     -e ISO_LABEL="${ISO_LABEL}" \
-    --network host \
     archlinux:latest \
     /bin/bash /serikaos/inner-build.sh
 

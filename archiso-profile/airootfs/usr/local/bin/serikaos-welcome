@@ -16,7 +16,13 @@ BLINK='\033[5m'
 
 clear
 
-
+if [[ ! -t 0 ]] && [[ -n "${DISPLAY:-}${WAYLAND_DISPLAY:-}" ]]; then
+    if command -v konsole >/dev/null 2>&1; then
+        exec konsole --fullscreen --hide-menubar --hide-tabbar -e /usr/local/bin/serikaos-welcome --in-terminal
+    elif command -v xterm >/dev/null 2>&1; then
+        exec xterm -fa "Monospace" -fs 12 -e /usr/local/bin/serikaos-welcome --in-terminal
+    fi
+fi
 
 # Get terminal dimensions
 COLS=$(tput cols 2>/dev/null || echo 80)
